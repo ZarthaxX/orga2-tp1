@@ -177,10 +177,34 @@ strDelete: ;void strDelete(char* pString)
 	call free
     ret
  
-strPrint:
+strPrint: ;void strPrint(char* pString, FILE *pFile)
     ret
-    
-listNew:
+   
+
+   typedef struct s_list{
+    struct s_listElem *first;
+    struct s_listElem *last;
+} list_t;
+
+typedef struct s_listElem{
+    void *data;
+    struct s_listElem *next;
+    struct s_listElem *prev;
+} listElem_t;
+
+%define list_t_first 0
+%define list_t_last 8
+%define listElem_t_data 0
+%define listElem_t_next 8
+%define listElem_t_prev 16
+
+listNew: ;list_t* listNew()
+	sub RSP, 8
+	mov RDI,16
+	call malloc
+	mov qword [RAX+list_t_first],0
+	mov qword [RAX+list_t_last],0
+	add RSP, 8
     ret
 
 listAddFirst:
