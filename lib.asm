@@ -27,7 +27,20 @@ global hashTableAdd
 global hashTableDeleteSlot
 global hashTableDelete
 
-strLen:
+;RDI RSI RDX RCX R8 R9 integers
+;XMM0 - XMM7 floats/doubles
+;RSP when full for floats or integers use this
+
+strLen: ;uint32_t strLen(char* pString)
+								RDI
+	xor RAX,RAX
+	.ciclo:
+		cmp byte [RDI], 0
+		je .fin
+		inc EAX
+		add RDI
+		jmp .ciclo
+	.fin:
     ret
 
 strClone:
