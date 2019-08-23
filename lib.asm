@@ -1,4 +1,3 @@
-
 section .rodata
 
 section .text
@@ -32,19 +31,19 @@ global hashTableDelete
 ;RSP when full for floats or integers use this
 
 strLen: ;uint32_t strLen(char* pString)
-							   RDI
+;							   RDI
 	xor RAX,RAX
 	.ciclo:
 		cmp byte [RDI], 0
 		je .fin
 		inc EAX
-		add RDI
+		inc RDI
 		jmp .ciclo
 	.fin:
     ret
 
 strClone: ;char* strClone(char* pString)
-								RDI
+;								RDI
 	;Obtengo la longitud del string y lo guardo en RCX
 	push RDI
 	call strLen
@@ -54,14 +53,14 @@ strClone: ;char* strClone(char* pString)
 	;Inicializo un bloque de memoria para guardar el nuevo string
 	push RDI
 	push RCX
-	lea RDI,RCX
+	mov RDI,RCX
 	call malloc
 	pop RCX
 	pop RDI
 
 	;Recorro el string original incrementado el puntero en RDI y copio el contenido en RAX
     mov byte [RAX + RCX * 1],0
-	.ciclo
+	.ciclo:
 		mov SIL,[RDI + RCX * 1 - 1]
 		mov [RAX + RCX * 1 - 1],SIL
 		loop .ciclo
@@ -69,7 +68,7 @@ strClone: ;char* strClone(char* pString)
 	ret
 
 strCmp: ;int32_t strCmp(char* pStringA, char* pStringB)
-							RDI				RSI
+;							RDI				RSI
 	;Obtengo la longitud del string A y lo guardo en RDX
 	push RDI
 	push RSI
@@ -120,7 +119,7 @@ strCmp: ;int32_t strCmp(char* pStringA, char* pStringB)
 	ret
 
 strConcat: ;char* strConcat(char* pStringA, char* pStringB)
-								RDI				RSI
+;								RDI				RSI
 	;Obtengo la longitud del string A y lo guardo en RDX
 	push RDI
 	push RSI
@@ -140,8 +139,7 @@ strConcat: ;char* strConcat(char* pStringA, char* pStringB)
 	pop RDX
 	mov RCX,RAX
 	
-	;Inicio un bloque de memoria del tamaño de las longitudes de ambos strings + 1 por el caracter nulo
-	inc RCX
+	;Inicio un bloque de memoria del tamaÃ±o de las longitudes de ambos strings + 1 por el caracter nulo
 	push RDX
 	push RCX
 	push RDI
@@ -156,24 +154,23 @@ strConcat: ;char* strConcat(char* pStringA, char* pStringB)
 	pop RDX
 
 	add RAX,RDX
-	mov [RAX + RCX * 1 ],0
-	.cycle:
+	mov byte [RAX + RCX * 1 ],0
+	.cycle1:
 		mov R8,[RSI + RCX * 1 - 1]
 		mov [RAX + RCX * 1 - 1],R8
-		loop .cycle
+		loop .cycle1
 
 	mov RCX,RDX
-
-	.cycle:
+	.cycle2:
 		mov R8,[RDI + RCX * 1 - 1]
 		mov [RAX - 1],R8
 		dec RAX
-		loop .cycle
+		loop .cycle2
 
     ret
 
 strDelete: ;void strDelete(char* pString)
-								RDI
+;								RDI
 	call free
     ret
  
@@ -181,16 +178,16 @@ strPrint: ;void strPrint(char* pString, FILE *pFile)
     ret
    
 
-   typedef struct s_list{
-    struct s_listElem *first;
-    struct s_listElem *last;
-} list_t;
+;   typedef struct s_list{
+;    struct s_listElem *first;
+;    struct s_listElem *last;
+;} list_t;
 
-typedef struct s_listElem{
-    void *data;
-    struct s_listElem *next;
-    struct s_listElem *prev;
-} listElem_t;
+;typedef struct s_listElem{
+;    void *data;
+;    struct s_listElem *next;
+;    struct s_listElem *prev;
+;} listElem_t;
 
 %define list_t_first 0
 %define list_t_last 8
