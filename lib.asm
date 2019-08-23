@@ -145,7 +145,7 @@ strConcat: ;char* strConcat(char* pStringA, char* pStringB)
 	push RDI
 	push RSI
 	mov RDI,RDX
-	add RDI,RCX
+	adcx RDI,RCX
 	inc RDI
 	call malloc
 	pop RSI
@@ -153,7 +153,7 @@ strConcat: ;char* strConcat(char* pStringA, char* pStringB)
 	pop RCX
 	pop RDX
 
-	add RAX,RDX
+	adcx RAX,RDX
 	mov byte [RAX + RCX * 1 ],0
 	.cycle1:
 		mov R8,[RSI + RCX * 1 - 1]
@@ -194,6 +194,8 @@ strPrint: ;void strPrint(char* pString, FILE *pFile)
 %define listElem_t_data 0
 %define listElem_t_next 8
 %define listElem_t_prev 16
+%define list_t_size 16
+%define listElem_t_size 24
 
 listNew: ;list_t* listNew()
 	sub RSP, 8
@@ -204,14 +206,134 @@ listNew: ;list_t* listNew()
 	add RSP, 8
     ret
 
-listAddFirst:
+listAddFirst: ;void listAddFirst(list_t* pList, void* data)
+;										RDI			RSI
+	;Inicializo bloque de memoria del tamaño de un nodo (24 bytes)
+	push RDI
+	push RSI
+	mov RDI,listElem_t_size
+	call malloc
+	pop RSI
+	pop RDI
+
+	;Seteo datos iniciales del nodo nuevo
+	mov [RAX+listElem_t_data],RSI
+	mov qword [RAX+listElem_t_prev],0
+	mov RSI,[RDI+list_t_first]
+	mov [RAX+listElem_t_next],RSI
+
+	;El prev del nodo viejo apunta al nuevo
+	mov [RSI+listElem_t_prev],RAX
+	
+	;Seteo el puntero al first de la lista al nuevo elemento
+	mov [RDI+list_t_first],RAX
+
     ret
 
-listAddLast:
+listAddLast: ;void listAddLast(list_t* pList, void* data)
+;										RDI			RSI
+	;Inicializo bloque de memoria del tamaño de un nodo (24 bytes)
+	push RDI
+	push RSI
+	mov RDI,listElem_t_size
+	call malloc
+	pop RSI
+	pop RDI
+
+	;Seteo datos iniciales del nodo nuevo
+	mov [RAX+listElem_t_data],RSI
+	mov qword [RAX+listElem_t_next],0
+	mov RSI,[RDI+list_t_last]
+	mov [RAX+listElem_t_prev],RSI
+
+	;El prev del nodo viejo apunta al nuevo
+	mov [RSI+listElem_t_next],RAX
+	
+	;Seteo el puntero al first de la lista al nuevo elemento
+	mov [RDI+list_t_last],RAX
+
+    ret
+	
+;%define list_t_first 0
+;%define list_t_last 8
+;%define listElem_t_data 0
+;%define listElem_t_next 8
+;%define listElem_t_prev 16
+;%define list_t_size 16
+;%define listElem_t_size 24
+
+listAdd: ;void listAdd(list_t* pList, void* data, funcCmp_t* fc)
+;								RDI			RSI				RDX
+	mov RCX,[RDI+list_t_first]
+	cmp RCX,0 ;Check if pointer is null
+	jmp addFirst ;If pointer to first element is null we use the function listAddFirst
+
+	;Check if element has to be inserted in the first position, if it as listAddFirst() is used
+	push RDI
+	push RSI
+	push RDX
+	push RCX
+	mov RDI,RSI
+	mov RSI,[RCX+listElem_t_data]
+	call RDX
+	pop RCX
+	pop RDX
+	pop RSI
+	pop RDI
+	cmp RAX,-1
+	jne addFirst
+
+	;Check if element has to be inserted in the last position, if it as listAddFirst() is used
+	push RDI
+	push RSI
+	push RDX
+	push RCX
+	mov RCX,[RDI+list_t_last]
+	mov RDI,RSI
+	mov RSI,[RCX+listElem_t_data]
+	call RDX
+	pop RCX
+	pop RDX
+	pop RSI
+	pop RDI
+	cmp RAX,1
+	jne addLast
+
+	mov RCX,[RDI+list_t_first]
+	.cycle:
+		push RDI
+		push RSI
+		push RDX
+		push RCX
+		mov RDI,RSI
+		mov RSI,[RCX + listElem_t_data]
+		call RDX
+		pop RCX
+		pop RDX
+		pop RSI
+		pop RDI
+		cmp RAX,-1
+		jne .addBetweenTwo ;If value returned by compare is not -1 we can insert this element here
+		mov RCX,[RCX + listElem_t_next]
+		jmp .cycle
+	
+	ret ;This ret should never be reached
+
+	.addBetweenTwo:
+	push RDI
+	push RSI
+	push RDX
+	push RCX
+	ret
+
+	.addLast:
+	call listAddLast
     ret
 
-listAdd:
-    ret
+	.addFirst:
+	call listAddFirst
+	ret
+
 
 listRemove:
     ret
