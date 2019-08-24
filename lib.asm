@@ -21,6 +21,7 @@ global listRemoveFirst
 global listRemoveLast
 global listDelete
 global listPrint
+global listPrintReverse
 global hashTableNew
 global hashTableAdd
 global hashTableDeleteSlot
@@ -176,6 +177,22 @@ strDelete: ;void strDelete(char* pString)
     ret
  
 strPrint: ;void strPrint(char* pString, FILE *pFile)
+;								RDI			RSI
+	push RBP
+	cmp RDI,0
+	jne .stringNotNull
+	mov RDI,RSI
+	mov RSI,'NULL'
+	call fprintf
+	jmp .end
+
+	.stringNotNull:
+	mov RDX,RDI
+	mov RDI,RSI
+	mov RSI,'%s'
+	call fprintf
+	.end:
+	pop RBP
     ret
    
 
@@ -388,16 +405,159 @@ listRemoveFirst: ;void listRemoveFirst(list_t* pList, funcDelete_t* fd)
 	ret
 
 listRemoveLast:
+    ;Check if an element exists in the list
+	cmp qword [RDI+list_t_last],0
+	jne .lastNotNull
+	ret
+
+	.lastNotNull:
+	mov RDX,[RDI+list_t_last]
+	push RDI
+	mov RDI,[RDX+listElem_t_data]
+	cmp RSI,0
+	je .fdIsNull
+	call RSI
+	jmp .end
+
+	.fdIsNull:
+	call free
+    
+    .end:
+    pop RDI
+	mov RCX,[RDX+listElem_t_prev]
+	cmp RCX,0
+	je .listIsEmpty
+	mov qword [RCX+listElem_t_next],0
+	mov [RDI+list_t_last],RCX
+	ret
+	.listIsEmpty:
+	mov qword [RDI+list_t_first],0
+	mov qword [RDI+list_t_last],0
+	ret
+
+listDelete: ;void listDelete(list_t* pList, funcDelete_t* fd)
+	;								RDI					RSI
+	push RBP
+	mov RBP,RSP
+	sub RSP,16
+	cmp RDI,0 ;list is null
+	je .end
+	mov RDI,[RDI+list_t_first]
+	cmp RDI,0
+	je .end
+
+	.cycle:
+		mov [RBP-8],RDI
+		mov [RBP-16],RSI
+		mov RDI,[RDI+list_t_data]
+		cmp RSI,0
+		je .free 
+
+		call RSI
+		jmp .next
+
+		.free:
+		call free
+
+		.next:
+		mov RDI,[RBP-8]
+		mov RSI,[RBP-16]
+		mov RDI,[RDI+list_t_next]
+		cmp RDI,0
+		jne .cycle
+
+	.end:
+	add RSP,16
+	pop RBP
     ret
 
-listDelete:
+listPrint: ;void listPrint(list_t* pList, FILE *pFile, funcPrint_t* fp)
+	;								RDI			RSI				RDX
+    push RBP
+	mov RBP,RSP
+	sub RSP,16
+	cmp RDI,0 ;list is null
+	je .end
+	mov RDI,[RDI+list_t_first]
+	cmp RDI,0
+	je .end
+
+	.cycle:
+		mov [RBP-8],RDI
+		mov [RBP-16],RSI
+		mov RDI,[RDI+list_t_data]
+		cmp RSI,0
+		je .free 
+
+		call RSI
+		jmp .next
+
+		.free:
+		call free
+
+		.next:
+		mov RDI,[RBP-8]
+		mov RSI,[RBP-16]
+		mov RDI,[RDI+list_t_next]
+		cmp RDI,0
+		jne .cycle
+
+	.end:
+	add RSP,16
+	pop RBP
     ret
 
-listPrint:
-    ret
+%if 0
+typedef struct s_hashTable{
+    struct s_list **listArray;
+    uint32_t size;
+    funcHash_t* funcHash;
+} hashTable_t;
+%endif
 
-hashTableNew:
-    ret
+%define hashTable_t.listArray 0
+%define hashTable_t.size 8
+%define hashTable_t.funcHash 12
+%define hashTable_t_size 20
+
+hashTableNew: ;hashTable_t* hashTableNew(uint32_t size, funcHash_t* funcHash)
+;												RDI						RSI
+   	push rbp
+   	mov rbp,rsp
+   	sub rsp,24
+   	mov [rbp-8],rdi
+   	mov [rbp-16],rsi
+
+   	;Initialize the hashTable struct
+   	mov rdi,hashTable_t_size
+   	call malloc
+   	mov [rbp-24],rax
+
+   	;We initialize the values in hashTable
+   	mov rdx,[rbp-16]
+   	mov [rax+hashTable_t.funcHash],rdx
+   	mov rdx,[rbp-8]
+   	mov [rax+hashTable_t.size],rdx
+   	lea rdi,[rdx*8]
+   	call malloc
+   	mov rdx,[rbp-24]
+   	mov [rdx+hashTable_t.listArray],rax
+
+   	mov rcx,[rbp-8]
+   	mov rdx,rax
+   	.cycle:
+   		push rcx
+   		push rdx
+   		call listNew
+   		pop rdx
+   		pop rcx
+   		mov [rdx+rcx*8-8],rax
+   		loop .cycle
+   	;Save on rax the pointer to the hashTable
+   	mov rax,[rbp-24]
+   	add rsp,24
+   	pop rbp
+   	ret
 
 hashTableAdd:
     ret
