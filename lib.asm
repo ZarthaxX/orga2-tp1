@@ -559,7 +559,17 @@ hashTableNew: ;hashTable_t* hashTableNew(uint32_t size, funcHash_t* funcHash)
    	pop rbp
    	ret
 
-hashTableAdd:
+hashTableAdd: ;void hashTableAdd(hashTable_t* pTable, void* data)
+;											RDI				RSI
+	push rbp
+	mov rbp,rsp
+	sub rsp,16
+	mov rdx,[rdi+hashTable_t.funcHash]
+	mov rdi,rsi
+	call rdx
+	
+	add rsp,16
+	pop rbp
     ret
     
 hashTableDeleteSlot:
