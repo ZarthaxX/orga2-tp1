@@ -566,27 +566,6 @@ listDelete: ;void listDelete(list_t* pList, funcDelete_t* fd)
 	pop RBP
     ret
 
-
-void listPrintReverse(list_t* pList, FILE *pFile, funcPrint_t* fp) {
-	s_listElem* last = pList->last;
-
-	fprintf(pFile,"[");
-
-	while (last != NULL) {
-
-		if(fp==NULL)
-			fprintf(pFile,"%p", last->data);
-		else
-			(*fp)(last->data,pFile);
-		last = last->prev;
-
-		if(last != NULL)
-			fprintf(pFile,",");
-	}
-
-	fprintf(pFile,"]");
-}
-
 listPrint: ;void listPrint(list_t* pList, FILE *pFile, funcPrint_t* fp)
 	;								RDI			RSI				RDX
     push rbp
@@ -613,7 +592,7 @@ listPrint: ;void listPrint(list_t* pList, FILE *pFile, funcPrint_t* fp)
     	mov rsi,[rbp-16]
     	call [rbp-24]
     	jmp .continue
-    	
+
     	.fpIsNull:
     	mov rdx,[rdi+listElem_t_data]
     	mov rsi,'%p'
@@ -649,8 +628,8 @@ typedef struct s_hashTable{
 
 %define hashTable_t.listArray 0
 %define hashTable_t.size 8
-%define hashTable_t.funcHash 12
-%define hashTable_t_size 20
+%define hashTable_t.funcHash 16
+%define hashTable_t_size 24
 
 hashTableNew: ;hashTable_t* hashTableNew(uint32_t size, funcHash_t* funcHash)
 ;												RDI						RSI
