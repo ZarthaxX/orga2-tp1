@@ -566,40 +566,77 @@ listDelete: ;void listDelete(list_t* pList, funcDelete_t* fd)
 	pop RBP
     ret
 
+
+void listPrintReverse(list_t* pList, FILE *pFile, funcPrint_t* fp) {
+	s_listElem* last = pList->last;
+
+	fprintf(pFile,"[");
+
+	while (last != NULL) {
+
+		if(fp==NULL)
+			fprintf(pFile,"%p", last->data);
+		else
+			(*fp)(last->data,pFile);
+		last = last->prev;
+
+		if(last != NULL)
+			fprintf(pFile,",");
+	}
+
+	fprintf(pFile,"]");
+}
+
 listPrint: ;void listPrint(list_t* pList, FILE *pFile, funcPrint_t* fp)
 	;								RDI			RSI				RDX
-    push RBP
-	mov RBP,RSP
-	sub RSP,16
-	cmp RDI,0 ;list is null
-	je .end
-	mov RDI,[RDI+list_t_first]
-	cmp RDI,0
-	je .end
+    push rbp
+    mov rbp,rsp
+    sub rsp,32
+    mov [rbp-8],rdi
+    mov [rbp-16],rsi
+    mov [rbp-24],rdx
+    mov rdi,rsi
+    mov rsi,'['
+    call fprintf
 
-	.cycle:
-		mov [RBP-8],RDI
-		mov [RBP-16],RSI
-		mov RDI,[RDI+listElem_t_data]
-		cmp RSI,0
-		je .free 
+    mov rdi,[rbp-8]
+    mov rdi,[rdi+list_t_first]
+    cmp rdi,0
+    jmp .end
 
-		call RSI
-		jmp .next
+    .cycle:
+    	mov [rbp-32],rdi
+    	cmp [rbp-24],0
+    	je .fpIsNull
 
-		.free:
-		call free
+    	mov rdi,[rdi+listElem_t_data]
+    	mov rsi,[rbp-16]
+    	call [rbp-24]
+    	jmp .continue
+    	
+    	.fpIsNull:
+    	mov rdx,[rdi+listElem_t_data]
+    	mov rsi,'%p'
+    	mov rdi,[rbp-16]
+    	call fprintf
 
-		.next:
-		mov RDI,[RBP-8]
-		mov RSI,[RBP-16]
-		mov RDI,[RDI+listElem_t_next]
-		cmp RDI,0
-		jne .cycle
-
-	.end:
-	add RSP,16
-	pop RBP
+    	.continue:
+    	mov rdi,[rbp-32]
+    	mov rdi,[rdi+listElem_t_next]
+    	cmp rdi,0
+    	je .end
+    	mov [rbp-32],rdi
+    	mov rdi,[rbp-16]
+    	mov rsi,','
+    	call fprintf
+    	mov rdi,[rbp-32]
+    	jmp .cycle
+    .end:
+    mov rdi,[rbp-16]
+    mov rsi,']'
+    call fprintf
+    add rsp,32
+    pop rbp
     ret
 
 %if 0
