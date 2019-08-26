@@ -436,13 +436,13 @@ listRemove: ;void listRemove(list_t* pList, void* data, funcCmp_t* fc, funcDelet
 
 		.removeNodeFirst:
 		mov rdi,[rsp-8]
-		mov rsi,[rsp-16]
+		mov rsi,[rsp-32]
 		call listRemoveFirst
 		jmp .continue
 
 		.removeNodeLast:
 		mov rdi,[rsp-8]
-		mov rsi,[rsp-16]
+		mov rsi,[rsp-32]
 		call listRemoveLast
 
 		.continue:
