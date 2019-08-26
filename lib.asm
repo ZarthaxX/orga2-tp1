@@ -33,6 +33,7 @@ global hashTableDelete
 
 strLen: ;uint32_t strLen(char* pString)
 ;							   RDI
+	push RBP
 	xor RAX,RAX
 	.ciclo:
 		cmp byte [RDI], 0
@@ -41,13 +42,17 @@ strLen: ;uint32_t strLen(char* pString)
 		inc RDI
 		jmp .ciclo
 	.fin:
+	pop RBP
     ret
 
 strClone: ;char* strClone(char* pString)
 ;								RDI
+	push RBP
 	;Obtengo la longitud del string y lo guardo en RCX
 	push RDI
+	sub RSP,8
 	call strLen
+	add RSP,8
 	pop RDI
 	mov RCX,RAX
 	inc RCX ;Sumo 1 para el caracter nulo
@@ -66,10 +71,12 @@ strClone: ;char* strClone(char* pString)
 		mov [RAX + RCX * 1 - 1],SIL
 		loop .ciclo
 
+	pop RBP
 	ret
 
 strCmp: ;int32_t strCmp(char* pStringA, char* pStringB)
 ;							RDI				RSI
+	push RBP
 	;Obtengo la longitud del string A y lo guardo en RDX
 	push RDI
 	push RSI
@@ -108,19 +115,22 @@ strCmp: ;int32_t strCmp(char* pStringA, char* pStringB)
 		inc RDI
 		inc RSI
 		loop .cycle
-	ret
+	jmp .end
 
 	.stringAisFirst:
 	mov EAX,-1
-    ret
+	jmp .end
 	
 	.stringBisFirst:
 	mov EAX,1
 
+	.end:
+	pop RBP
 	ret
 
 strConcat: ;char* strConcat(char* pStringA, char* pStringB)
 ;								RDI				RSI
+	push RBP
 	;Obtengo la longitud del string A y lo guardo en RDX
 	push RDI
 	push RSI
@@ -133,8 +143,10 @@ strConcat: ;char* strConcat(char* pStringA, char* pStringB)
 	push RDX
 	push RDI
 	push RSI
+	sub RSP,8
 	mov RDI,RSI
 	call strLen
+	add RSP,8
 	pop RSI
 	pop RDI
 	pop RDX
@@ -154,7 +166,7 @@ strConcat: ;char* strConcat(char* pStringA, char* pStringB)
 	pop RCX
 	pop RDX
 
-	adcx RAX,RDX
+	add RAX,RDX
 	push RDX
 	mov byte [RAX + RCX * 1 ],0
 	.cycle1:
@@ -169,11 +181,14 @@ strConcat: ;char* strConcat(char* pStringA, char* pStringB)
 		dec RAX
 		loop .cycle2
 
+	pop RBP
     ret
 
 strDelete: ;void strDelete(char* pString)
 ;								RDI
+	push RBP
 	call free
+	pop RBP
     ret
  
 strPrint: ;void strPrint(char* pString, FILE *pFile)
@@ -216,16 +231,17 @@ strPrint: ;void strPrint(char* pString, FILE *pFile)
 %define listElem_t_size 24
 
 listNew: ;list_t* listNew()
-	sub RSP, 8
+	push RBP
 	mov RDI,16
 	call malloc
 	mov qword [RAX+list_t_first],0
 	mov qword [RAX+list_t_last],0
-	add RSP, 8
+	pop RBP
     ret
 
 listAddFirst: ;void listAddFirst(list_t* pList, void* data)
 ;										RDI			RSI
+	push RBP
 	;Inicializo bloque de memoria del tamaño de un nodo (24 bytes)
 	push RDI
 	push RSI
@@ -248,14 +264,18 @@ listAddFirst: ;void listAddFirst(list_t* pList, void* data)
 	je .firstIsNull
 	;El prev del nodo viejo apunta al nuevo
 	mov [RSI+listElem_t_prev],RAX
-	ret
+	jmp .end
 
 	.firstIsNull:
 	mov [RDI+list_t_last],RAX
+	
+	.end:
+	pop RBP
     ret
 
 listAddLast: ;void listAddLast(list_t* pList, void* data)
 ;										RDI			RSI
+	push RBP
 	;Inicializo bloque de memoria del tamaño de un nodo (24 bytes)
 	push RDI
 	push RSI
@@ -278,10 +298,13 @@ listAddLast: ;void listAddLast(list_t* pList, void* data)
 	je .lastIsNull
 	;El next del nodo viejo apunta al nuevo
 	mov [RSI+listElem_t_next],RAX
-	ret
+	jmp .end
 
 	.lastIsNull:
 	mov [RDI+list_t_first],RAX
+    
+    .end:
+	pop RBP
     ret
 	
 ;%define list_t_first 0
@@ -294,86 +317,148 @@ listAddLast: ;void listAddLast(list_t* pList, void* data)
 
 listAdd: ;void listAdd(list_t* pList, void* data, funcCmp_t* fc)
 ;								RDI			RSI				RDX
-	;Inicializo bloque de memoria del tamaño de un nodo (24 bytes)
-	push RDI
-	push RSI
-	mov RDI,listElem_t_size
+	push rbp
+	mov rbp,rsp
+	sub rsp,32
+	;Save the 3 initial parameters in stack
+	mov [rsp-8],rdi
+	mov [rsp-16],rsi
+	mov [rsp-24],rdx
+
+	;Create new node for list
+	mov rdi,listElem_t_size
 	call malloc
-	pop RSI
-	pop RDI
+	mov [rsp-32],rax
+	mov [rax+listElem_t_data],rsi
 
-	mov RCX,[RDI+list_t_first]
-	cmp RCX,0 ;Check if pointer is null
-	jmp .addFirst ;If pointer to first element is null we use the function listAddFirst
+	mov rdi,[rdi+list_t_first] ;Save the next node to visit
+	mov rsi,0 ;Save the last seen prev node,initially NULL
 
-	;Check if element has to be inserted in the first position, if it as listAddFirst() is used
-	push RDI
-	push RSI
-	push RDX
-	push RCX
-	mov RDI,RSI
-	mov RSI,[RCX+listElem_t_data]
-	call RDX
-	pop RCX
-	pop RDX
-	pop RSI
-	pop RDI
-	cmp RAX,-1
-	jne .addFirst
-
-	;Check if element has to be inserted in the last position, if it as listAddFirst() is used
-	push RDI
-	push RSI
-	push RDX
-	push RCX
-	mov RCX,[RDI+list_t_last]
-	mov RDI,RSI
-	mov RSI,[RCX+listElem_t_data]
-	call RDX
-	pop RCX
-	pop RDX
-	pop RSI
-	pop RDI
-	cmp RAX,1
-	jne .addLast
-
-	mov RCX,[RDI+list_t_first]
 	.cycle:
-		push RDI
-		push RSI
-		push RDX
-		push RCX
-		mov RDI,RSI
-		mov RSI,[RCX + listElem_t_data]
-		call RDX
-		pop RCX
-		pop RDX
-		pop RSI
-		pop RDI
-		cmp RAX,-1
-		jne .addBetweenTwo ;If value returned by compare is not -1 we can insert this element here
-		mov RCX,[RCX + listElem_t_next]
+		cmp rdi,0
+		je .end ;If next node is NULL, list end reached and we exit
+		push rdi
+		push rsi
+		;We compare the 2 values, the one pointed by *data and the actual node data
+		mov rsi,[rsp-16]
+		mov rdi,[rdi+listElem_t_data]
+		call [rsp-24]
+		pop rsi
+		pop rdi
+
+		cmp rax,1 
+		jne .insertNode ;Jump if the new node data is <= next node data
+		mov rsi,rdi
+		mov rdi,[rdi+listElem_t_next]
 		jmp .cycle
-	
-	ret ;This ret should never be reached
 
-	.addBetweenTwo:
-	ret
+	.insertNode:
+	cmp rsi,0 ;Node is smaller than min element or list is empty
+	je .addNodeFirst
+	cmp rdi,0 ;Node is greater than max element
+	je .addNodeLast
+	;New node has to be inserted between 2 nodes
+	mov rdx,[rsp-32]
+	mov [rsi+listElem_t_next],rdx ;prevNode.next points to newNode
+	mov [rdi+listElem_t_prev],rdx ;nextNode.prev points to newNode
+	mov [rdx+listElem_t_prev],rsi ;newNode.prev points to prevNode
+	mov [rdx+listElem_t_next],rdi ;newNode.next points to nextNode
+	jmp .end
 
-	.addLast:
-	call listAddLast
-    ret
-
-	.addFirst:
+	.addNodeFirst:
+	mov rdi,[rsp-8]
+	mov rsi,[rsp-16]
 	call listAddFirst
+	jmp .end
+
+	.addNodeLast:
+	mov rdi,[rsp-8]
+	mov rsi,[rsp-16]
+	call listAddLast
+	jmp .end
+
+	.end:
+	add rsp,32
+	pop rbp
 	ret
 
 
-listRemove:
-    ret
+listRemove: ;void listRemove(list_t* pList, void* data, funcCmp_t* fc, funcDelete_t* fd)
+;								RDI			RSI				RDX 					RCX
+	push rbp
+	mov rbp,rsp
+	sub rsp,32
+	;Save the 3 initial parameters in stack
+	mov [rsp-8],rdi
+	mov [rsp-16],rsi
+	mov [rsp-24],rdx
+	mov [rsp-32],rcx
+
+	mov rdi,[rdi+list_t_first] ;Save the next node to visit
+
+	.cycle:
+		cmp rdi,0
+		je .end ;If next node is NULL, list end reached and we exit
+		sub rsp,8
+		push rdi
+		;We compare the 2 values, the one pointed by *data and the actual node data
+		mov rsi,[rsp-16]
+		mov rdi,[rdi+listElem_t_data]
+		call [rsp-24]
+
+		pop rdi
+		add rsp,8
+
+		sub rsp,8
+		push rdi
+
+		cmp rax,0
+		jne .continue ;Continue if the new node data is == next node data
+		
+		mov rsi,[rdi+listElem_t_prev]
+		cmp rsi,0 ;Node has no prev, so it is the first node
+		je .removeNodeFirst
+		mov rdx,[rdi+listElem_t_next]
+		cmp rdx,0 ;Node has no next, so it is the last node
+		je .removeNodeLast
+		;Delete node between 2 nodes
+		mov [rsi+listElem_t_next],rdx
+		mov [rdx+listElem_t_prev],rsi
+
+		cmp [rsp-32],0
+		je fdIsNull 
+		call [rsp-32]
+		jmp .continue
+
+		.fdIsNull:
+		call free
+		jmp .continue
+
+		.removeNodeFirst:
+		mov rdi,[rsp-8]
+		mov rsi,[rsp-16]
+		call listRemoveFirst
+		jmp .continue
+
+		.removeNodeLast:
+		mov rdi,[rsp-8]
+		mov rsi,[rsp-16]
+		call listRemoveLast
+
+		.continue:
+		pop rdi
+		add rsp,8
+		mov rdi,[rdi+listElem_t_next]
+		jmp .cycle
+
+	.end:
+	add rsp,32
+	pop rbp
+	ret
 
 listRemoveFirst: ;void listRemoveFirst(list_t* pList, funcDelete_t* fd)
 ;											RDI					RSI
+	push RBP
 	;Check if an element exists in the list
 	cmp qword [RDI+list_t_first],0
 	jne .firstNotNull
@@ -382,6 +467,7 @@ listRemoveFirst: ;void listRemoveFirst(list_t* pList, funcDelete_t* fd)
 	.firstNotNull:
 	mov RDX,[RDI+list_t_first]
 	push RDI
+	sub RSP,8
 	mov RDI,[RDX+listElem_t_data]
 	cmp RSI,0
 	je .fdIsNull
@@ -392,19 +478,26 @@ listRemoveFirst: ;void listRemoveFirst(list_t* pList, funcDelete_t* fd)
 	call free
     
     .end:
+    add RSP,8
     pop RDI
 	mov RCX,[RDX+listElem_t_next]
 	cmp RCX,0
 	je .listIsEmpty
 	mov qword [RCX+listElem_t_prev],0
 	mov [RDI+list_t_first],RCX
-	ret
+	jmp .end
+
 	.listIsEmpty:
 	mov qword [RDI+list_t_first],0
 	mov qword [RDI+list_t_last],0
+	
+	end:
+	pop RBP
 	ret
 
-listRemoveLast:
+listRemoveLast: ;void listRemoveLast(list_t* pList, funcDelete_t* fd)
+;											RDI					RSI
+    push RBP
     ;Check if an element exists in the list
 	cmp qword [RDI+list_t_last],0
 	jne .lastNotNull
@@ -413,6 +506,7 @@ listRemoveLast:
 	.lastNotNull:
 	mov RDX,[RDI+list_t_last]
 	push RDI
+	sub RSP,8
 	mov RDI,[RDX+listElem_t_data]
 	cmp RSI,0
 	je .fdIsNull
@@ -423,6 +517,7 @@ listRemoveLast:
 	call free
     
     .end:
+    add RSP,8
     pop RDI
 	mov RCX,[RDX+listElem_t_prev]
 	cmp RCX,0
@@ -564,16 +659,65 @@ hashTableAdd: ;void hashTableAdd(hashTable_t* pTable, void* data)
 	push rbp
 	mov rbp,rsp
 	sub rsp,16
+
+	mov [rsp-8],rdi
+	mov [rsp-16],rsi
+
 	mov rdx,[rdi+hashTable_t.funcHash]
 	mov rdi,rsi
 	call rdx
-	
+	mov rdx,rax
+	mov rdi,[rsp-8]
+	div dword [rdi+hashTable_t.size]
+	mov rdi,[rdi+hashTable_t.listArray]
+	shl rax,32
+	shr rax,32
+	mov rdi,[rdi+rax*8]
+	mov rsi,[rsp-16]
+	mov rdx,strCmp
+	call listAdd
+
 	add rsp,16
 	pop rbp
     ret
     
-hashTableDeleteSlot:
+hashTableDeleteSlot: ;void hashTableDeleteSlot(hashTable_t* pTable, uint32_t slot, funcDelete_t* fd)
+;														RDI					RSI				RDX
+	push rbp
+	mov rdi,[rdi+hashTable_t.listArray]
+	push rdi
+	push rsi
+	mov rdi,[rdi+rsi*8]
+	mov rsi,rdx
+	call listDelete
+	call listNew
+	pop rsi
+	pop rdi
+	mov [rdi+rsi*8],rax
+	pop rbp
     ret
 
-hashTableDelete:
+hashTableDelete: ;void hashTableDelete(hashTable_t* pTable, funcDelete_t* fd)
+;													RDI					RSI
+	push rbp
+	mov rbp,rsp
+	sub rsp,16
+	mov [rbp-8],rdi
+	mov rcx,[rdi+hashTable_t.size]
+	mov rdi,[rdi+hashTable_t.listArray]
+	.cycle:
+		;Delete a slot from the listArray of hashtable
+		push rdi
+		push rsi
+		call listDelete
+		pop rsi
+		pop rdi
+		add rdi,8
+		loop .cycle
+
+	;Delete the hash table struct itself
+	mov rdi,[rbp-8]
+	call free
+	add rsp,16
+	pop rbp
     ret

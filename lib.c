@@ -22,6 +22,7 @@ char* strSubstring(char* pString, uint32_t inicio, uint32_t fin) {
 	cerr << new_length << endl;
 	ptr[new_length-1] = 0;
 	
+	free(pString);
     return ptr;
 }
 
