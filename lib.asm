@@ -425,8 +425,8 @@ listRemove: ;void listRemove(list_t* pList, void* data, funcCmp_t* fc, funcDelet
 		mov [rsi+listElem_t_next],rdx
 		mov [rdx+listElem_t_prev],rsi
 
-		cmp [rsp-32],0
-		je fdIsNull 
+		cmp qword [rsp-32],0
+		je .fdIsNull 
 		call [rsp-32]
 		jmp .continue
 
@@ -544,7 +544,7 @@ listDelete: ;void listDelete(list_t* pList, funcDelete_t* fd)
 	.cycle:
 		mov [RBP-8],RDI
 		mov [RBP-16],RSI
-		mov RDI,[RDI+list_t_data]
+		mov RDI,[RDI+listElem_t_data]
 		cmp RSI,0
 		je .free 
 
@@ -557,7 +557,7 @@ listDelete: ;void listDelete(list_t* pList, funcDelete_t* fd)
 		.next:
 		mov RDI,[RBP-8]
 		mov RSI,[RBP-16]
-		mov RDI,[RDI+list_t_next]
+		mov RDI,[RDI+listElem_t_next]
 		cmp RDI,0
 		jne .cycle
 
@@ -580,7 +580,7 @@ listPrint: ;void listPrint(list_t* pList, FILE *pFile, funcPrint_t* fp)
 	.cycle:
 		mov [RBP-8],RDI
 		mov [RBP-16],RSI
-		mov RDI,[RDI+list_t_data]
+		mov RDI,[RDI+listElem_t_data]
 		cmp RSI,0
 		je .free 
 
@@ -593,7 +593,7 @@ listPrint: ;void listPrint(list_t* pList, FILE *pFile, funcPrint_t* fp)
 		.next:
 		mov RDI,[RBP-8]
 		mov RSI,[RBP-16]
-		mov RDI,[RDI+list_t_next]
+		mov RDI,[RDI+listElem_t_next]
 		cmp RDI,0
 		jne .cycle
 
