@@ -390,7 +390,7 @@ listRemove: ;void listRemove(list_t* pList, void* data, funcCmp_t* fc, funcDelet
 ;								RDI			RSI				RDX 					RCX
 	push rbp
 	mov rbp,rsp
-	sub rsp,32
+	sub rsp,48
 	;Save the 3 initial parameters in stack
 	mov [rbp-8],rdi
 	mov [rbp-16],rsi
@@ -402,22 +402,18 @@ listRemove: ;void listRemove(list_t* pList, void* data, funcCmp_t* fc, funcDelet
 	.cycle:
 		cmp rdi,0
 		je .end ;If next node is NULL, list end reached and we exit
-		sub rsp,8
-		push rdi
+		mov [rbp-40],rdi ; Save actual node pointer
+		mov rsi,[rdi+listElem_t_next]
+		mov [rbp-48],rsi ; Save next node pointer
 		;We compare the 2 values, the one pointed by *data and the actual node data
 		mov rsi,[rbp-16]
 		mov rdi,[rdi+listElem_t_data]
 		call [rbp-24]
 
-		pop rdi
-		add rsp,8
-
-		sub rsp,8
-		push rdi
-
 		cmp rax,0
 		jne .continue ;Continue if the new node data is == next node data
 		
+		mov rdi,[rbp-40]
 		mov rsi,[rdi+listElem_t_prev]
 		cmp rsi,0 ;Node has no prev, so it is the first node
 		je .removeNodeFirst
@@ -428,12 +424,17 @@ listRemove: ;void listRemove(list_t* pList, void* data, funcCmp_t* fc, funcDelet
 		mov [rsi+listElem_t_next],rdx
 		mov [rdx+listElem_t_prev],rsi
 
+		mov rdi,[rdi+listElem_t_data]
 		cmp qword [rbp-32],0
 		je .fdIsNull 
 		call [rbp-32]
-		jmp .continue
+		jmp .deleteStruct
 
 		.fdIsNull:
+		call free
+
+		.deleteStruct:
+		mov rdi,[rbp-40]
 		call free
 		jmp .continue
 
@@ -449,13 +450,11 @@ listRemove: ;void listRemove(list_t* pList, void* data, funcCmp_t* fc, funcDelet
 		call listRemoveLast
 
 		.continue:
-		pop rdi
-		add rsp,8
-		mov rdi,[rdi+listElem_t_next]
+		mov rdi,[rbp-48]
 		jmp .cycle
 
 	.end:
-	add rsp,32
+	add rsp,48
 	pop rbp
 	ret
 
