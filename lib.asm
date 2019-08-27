@@ -561,7 +561,8 @@ listDelete: ;void listDelete(list_t* pList, funcDelete_t* fd)
 	;								RDI					RSI
 	push RBP
 	mov RBP,RSP
-	sub RSP,16
+	push rdi
+Sub rsp,8
 	cmp RDI,0 ;list is null
 	je .end
 	mov RDI,[RDI+list_t_first]
@@ -569,7 +570,8 @@ listDelete: ;void listDelete(list_t* pList, funcDelete_t* fd)
 	je .end
 
 	.cycle:
-		mov [RBP-8],RDI
+		push rdi
+Push rsi
 		mov [RBP-16],RSI
 		mov RDI,[RDI+listElem_t_data]
 		cmp RSI,0
@@ -581,14 +583,17 @@ listDelete: ;void listDelete(list_t* pList, funcDelete_t* fd)
 		.free:
 		call free
 
-		.next:
-		mov RDI,[RBP-8]
-		mov RSI,[RBP-16]
+.next:
+Pop rsi
+Pop rdi
 		mov RDI,[RDI+listElem_t_next]
 		cmp RDI,0
 		jne .cycle
 
 	.end:
+Add rsp,8
+pop rdi
+call free
 	add RSP,16
 	pop RBP
     ret
