@@ -638,7 +638,7 @@ hashTableNew: ;hashTable_t* hashTableNew(uint32_t size, funcHash_t* funcHash)
 ;												RDI						RSI
    	push rbp
    	mov rbp,rsp
-   	sub rsp,24
+   	sub rsp,32
    	mov [rbp-8],rdi
    	mov [rbp-16],rsi
 
@@ -669,7 +669,7 @@ hashTableNew: ;hashTable_t* hashTableNew(uint32_t size, funcHash_t* funcHash)
    		loop .cycle
    	;Save on rax the pointer to the hashTable
    	mov rax,[rbp-24]
-   	add rsp,24
+   	add rsp,32
    	pop rbp
    	ret
 
