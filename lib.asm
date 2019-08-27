@@ -331,8 +331,9 @@ listAdd: ;void listAdd(list_t* pList, void* data, funcCmp_t* fc)
 	mov rdi,listElem_t_size
 	call malloc
 	mov [rsp-32],rax
+	mov rsi,[rsp-16]
 	mov [rax+listElem_t_data],rsi
-
+	mov rdi,[rsp-8]
 	mov rdi,[rdi+list_t_first] ;Save the next node to visit
 	mov rsi,0 ;Save the last seen prev node,initially NULL
 
