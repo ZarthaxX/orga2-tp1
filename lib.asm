@@ -3,6 +3,11 @@ section .rodata
 null : DB 'NULL',0
 strFormat : DB '%s',0
 
+listStart : DB '[',0
+listEnd : DB ']',0
+elementSeparator : DB ',',0
+ptrFormat : DB '%p',0
+
 section .text
 
 extern malloc
@@ -132,58 +137,62 @@ strCmp: ;int32_t strCmp(char* pStringA, char* pStringB)
 
 strConcat: ;char* strConcat(char* pStringA, char* pStringB)
 ;								RDI				RSI
-	push RBP
-	;Obtengo la longitud del string A y lo guardo en RDX
-	push RDI
-	push RSI
+	push rbp
+	mov rbp,rsp
+	sub rsp,32
+	mov [rbp-8],rdi
+	mov [rbp-16],rsi
+
+	;Get length of string A
 	call strLen
-	pop RSI
-	pop RDI
-	mov RDX,RAX
-	
-	;Obtengo la longitud del string B y lo guardo en RCX
-	push RDX
-	push RDI
-	push RSI
-	sub RSP,8
-	mov RDI,RSI
+	shl rax,32
+	shr rax,32
+	mov [rbp-24],rax
+
+	;Get length of string B
+	mov rdi,[rbp-16]
 	call strLen
-	add RSP,8
-	pop RSI
-	pop RDI
-	pop RDX
-	mov RCX,RAX
-	
-	;Inicio un bloque de memoria del tamaño de las longitudes de ambos strings + 1 por el caracter nulo
-	push RDX
-	push RCX
-	push RDI
-	push RSI
-	mov RDI,RDX
-	adcx RDI,RCX
-	inc RDI
+	shl rax,32
+	shr rax,32
+	mov [rbp-32],rax
+
+	;Allocate block of memory for concat of strings
+	mov rdi,[rbp-24]
+	add rdi,[rbp-32]
+	inc rdi
 	call malloc
-	pop RSI
-	pop RDI
-	pop RCX
-	pop RDX
 
-	add RAX,RDX
-	push RDX
-	mov byte [RAX + RCX * 1 ],0
-	.cycle1:
-		mov DL,[RSI + RCX * 1 - 1]
-		mov [RAX + RCX * 1 - 1],DL
-		loop .cycle1
-	pop RDX
-	mov RCX,RDX
-	.cycle2:
-		mov DL,[RDI + RCX * 1 - 1]
-		mov [RAX - 1],DL
-		dec RAX
-		loop .cycle2
+	mov rdx,0
+	mov rdi,[rbp-8]
+	.copyA:
+		cmp byte [rdi+rdx*1],0
+		je .endCopyA
+		mov cl,[rdi+rdx*1]
+		mov [rax+rdx],cl
+		inc rdx
+		jmp .copyA
 
-	pop RBP
+	.endCopyA:
+
+	mov rdx,0
+	mov rdi,[rbp-16]
+	.copyB:
+		cmp byte [rdi+rdx*1],0
+		je .endCopyB
+		mov cl,[rdi+rdx*1]
+		push rdx
+		add rdx,[rbp-24]
+		mov [rax+rdx],cl
+		pop rdx
+		inc rdx
+		jmp .copyB
+
+	.endCopyB:
+	mov rdx,[rbp-24]
+	add rdx,[rbp-32]
+	mov byte [rax+rdx*1],0
+	add rsp,32
+	pop rbp
     ret
 
 strDelete: ;void strDelete(char* pString)
@@ -460,76 +469,92 @@ listRemove: ;void listRemove(list_t* pList, void* data, funcCmp_t* fc, funcDelet
 
 listRemoveFirst: ;void listRemoveFirst(list_t* pList, funcDelete_t* fd)
 ;											RDI					RSI
-	push RBP
-	;Check if an element exists in the list
-	cmp qword [RDI+list_t_first],0
-	jne .firstNotNull
-	ret
+	push rbp
+	mov rbp,rsp
+	sub rsp,16
+	mov [rbp-8],rdi
+	mov [rbp-16],rsi
 
-	.firstNotNull:
-	mov RDX,[RDI+list_t_first]
-	push RDI
-	sub RSP,8
-	mov RDI,[RDX+listElem_t_data]
-	cmp RSI,0
+	cmp qword [rdi+list_t_first],0
+	je .end
+
+	mov rdi,[rdi+listElem_t_data]
+	cmp rsi,0
 	je .fdIsNull
-	call RSI
-	jmp .end
+	call [rbp-16]
+	jmp .eraseStruct
 
 	.fdIsNull:
 	call free
-    
-    .end:
-    add RSP,8
-    pop RDI
-	mov RCX,[RDX+listElem_t_next]
-	cmp RCX,0
-	je .listIsEmpty
-	mov qword [RCX+listElem_t_prev],0
-	mov [RDI+list_t_first],RCX
+	
+	.eraseStruct:
+	mov rdi,[rbp-8]
+	mov rdi,[rdi+list_t_first]
+	mov rsi,[rdi+listElem_t_next]
+	push rsi
+	sub rsp,8
+	call free
+	add rsp,8
+	pop rsi
+	mov rdi,[rbp-8]
+	cmp rsi,0
+	je .emptyList
+	mov [rdi+list_t_first],rsi
+	mov qword [rsi+listElem_t_prev],0
 	jmp .end
 
-	.listIsEmpty:
-	mov qword [RDI+list_t_first],0
-	mov qword [RDI+list_t_last],0
-	
-	end:
-	pop RBP
+	.emptyList:
+	mov qword [rdi+list_t_first],0
+	mov qword [rdi+list_t_last],0
+
+	.end:
+	add rsp,16
+	pop rbp
 	ret
 
 listRemoveLast: ;void listRemoveLast(list_t* pList, funcDelete_t* fd)
 ;											RDI					RSI
-    push RBP
-    ;Check if an element exists in the list
-	cmp qword [RDI+list_t_last],0
-	jne .lastNotNull
-	ret
+    push rbp
+	mov rbp,rsp
+	sub rsp,16
+	mov [rbp-8],rdi
+	mov [rbp-16],rsi
 
-	.lastNotNull:
-	mov RDX,[RDI+list_t_last]
-	push RDI
-	sub RSP,8
-	mov RDI,[RDX+listElem_t_data]
-	cmp RSI,0
+	cmp qword [rdi+list_t_last],0
+	je .end
+
+	mov rdi,[rdi+listElem_t_data]
+	cmp rsi,0
 	je .fdIsNull
-	call RSI
-	jmp .end
+	call [rbp-16]
+	jmp .eraseStruct
 
 	.fdIsNull:
 	call free
-    
-    .end:
-    add RSP,8
-    pop RDI
-	mov RCX,[RDX+listElem_t_prev]
-	cmp RCX,0
-	je .listIsEmpty
-	mov qword [RCX+listElem_t_next],0
-	mov [RDI+list_t_last],RCX
-	ret
-	.listIsEmpty:
-	mov qword [RDI+list_t_first],0
-	mov qword [RDI+list_t_last],0
+	
+	.eraseStruct:
+	mov rdi,[rbp-8]
+	mov rdi,[rdi+list_t_last]
+	mov rsi,[rdi+listElem_t_prev]
+	push rsi
+	sub rsp,8
+	call free
+	add rsp,8
+	pop rsi
+	mov rdi,[rbp-8]
+	cmp rsi,0
+	je .emptyList
+	mov [rdi+list_t_last],rsi
+	mov qword [rsi+listElem_t_next],0
+	jmp .end
+
+	.emptyList:
+	mov qword [rdi+list_t_first],0
+	mov qword [rdi+list_t_last],0
+
+	.end:
+	add rsp,16
+	pop rbp
 	ret
 
 listDelete: ;void listDelete(list_t* pList, funcDelete_t* fd)
@@ -577,7 +602,7 @@ listPrint: ;void listPrint(list_t* pList, FILE *pFile, funcPrint_t* fp)
     mov [rbp-16],rsi
     mov [rbp-24],rdx
     mov rdi,rsi
-    mov rsi,'['
+    mov rsi,listStart
     call fprintf
 
     mov rdi,[rbp-8]
@@ -587,7 +612,7 @@ listPrint: ;void listPrint(list_t* pList, FILE *pFile, funcPrint_t* fp)
 
     .cycle:
     	mov [rbp-32],rdi
-    	cmp [rbp-24],0
+    	cmp qword [rbp-24],0
     	je .fpIsNull
 
     	mov rdi,[rdi+listElem_t_data]
@@ -597,7 +622,7 @@ listPrint: ;void listPrint(list_t* pList, FILE *pFile, funcPrint_t* fp)
 
     	.fpIsNull:
     	mov rdx,[rdi+listElem_t_data]
-    	mov rsi,'%p'
+    	mov rsi,ptrFormat
     	mov rdi,[rbp-16]
     	call fprintf
 
@@ -608,13 +633,13 @@ listPrint: ;void listPrint(list_t* pList, FILE *pFile, funcPrint_t* fp)
     	je .end
     	mov [rbp-32],rdi
     	mov rdi,[rbp-16]
-    	mov rsi,','
+    	mov rsi,elementSeparator
     	call fprintf
     	mov rdi,[rbp-32]
     	jmp .cycle
     .end:
     mov rdi,[rbp-16]
-    mov rsi,']'
+    mov rsi,listEnd
     call fprintf
     add rsp,32
     pop rbp
