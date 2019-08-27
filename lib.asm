@@ -1,5 +1,8 @@
 section .rodata
 
+null : DB 'NULL',0
+strFormat : DB '%s',0
+
 section .text
 
 extern malloc
@@ -65,7 +68,6 @@ strClone: ;char* strClone(char* pString)
 	pop RDI
 
 	;Recorro el string original incrementado el puntero en RDI y copio el contenido en RAX
-    mov byte [RAX + RCX * 1],0
 	.ciclo:
 		mov SIL,[RDI + RCX * 1 - 1]
 		mov [RAX + RCX * 1 - 1],SIL
@@ -190,21 +192,21 @@ strDelete: ;void strDelete(char* pString)
 	call free
 	pop RBP
     ret
- 
+
 strPrint: ;void strPrint(char* pString, FILE *pFile)
 ;								RDI			RSI
 	push RBP
 	cmp RDI,0
 	jne .stringNotNull
 	mov RDI,RSI
-	mov RSI,'NULL'
+	mov RSI,null
 	call fprintf
 	jmp .end
 
 	.stringNotNull:
 	mov RDX,RDI
 	mov RDI,RSI
-	mov RSI,'%s'
+	mov RSI,strFormat
 	call fprintf
 	.end:
 	pop RBP
