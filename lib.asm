@@ -323,17 +323,17 @@ listAdd: ;void listAdd(list_t* pList, void* data, funcCmp_t* fc)
 	mov rbp,rsp
 	sub rsp,32
 	;Save the 3 initial parameters in stack
-	mov [rsp-8],rdi
-	mov [rsp-16],rsi
-	mov [rsp-24],rdx
+	mov [rbp-8],rdi
+	mov [rbp-16],rsi
+	mov [rbp-24],rdx
 
 	;Create new node for list
 	mov rdi,listElem_t_size
 	call malloc
-	mov [rsp-32],rax
-	mov rsi,[rsp-16]
+	mov [rbp-32],rax
+	mov rsi,[rbp-16]
 	mov [rax+listElem_t_data],rsi
-	mov rdi,[rsp-8]
+	mov rdi,[rbp-8]
 	mov rdi,[rdi+list_t_first] ;Save the next node to visit
 	mov rsi,0 ;Save the last seen prev node,initially NULL
 
@@ -343,9 +343,9 @@ listAdd: ;void listAdd(list_t* pList, void* data, funcCmp_t* fc)
 		push rdi
 		push rsi
 		;We compare the 2 values, the one pointed by *data and the actual node data
-		mov rsi,[rsp-16]
+		mov rsi,[rbp-16]
 		mov rdi,[rdi+listElem_t_data]
-		call [rsp-24]
+		call [rbp-24]
 		pop rsi
 		pop rdi
 
@@ -361,7 +361,7 @@ listAdd: ;void listAdd(list_t* pList, void* data, funcCmp_t* fc)
 	cmp rdi,0 ;Node is greater than max element
 	je .addNodeLast
 	;New node has to be inserted between 2 nodes
-	mov rdx,[rsp-32]
+	mov rdx,[rbp-32]
 	mov [rsi+listElem_t_next],rdx ;prevNode.next points to newNode
 	mov [rdi+listElem_t_prev],rdx ;nextNode.prev points to newNode
 	mov [rdx+listElem_t_prev],rsi ;newNode.prev points to prevNode
@@ -369,14 +369,14 @@ listAdd: ;void listAdd(list_t* pList, void* data, funcCmp_t* fc)
 	jmp .end
 
 	.addNodeFirst:
-	mov rdi,[rsp-8]
-	mov rsi,[rsp-16]
+	mov rdi,[rbp-8]
+	mov rsi,[rbp-16]
 	call listAddFirst
 	jmp .end
 
 	.addNodeLast:
-	mov rdi,[rsp-8]
-	mov rsi,[rsp-16]
+	mov rdi,[rbp-8]
+	mov rsi,[rbp-16]
 	call listAddLast
 	jmp .end
 
@@ -392,10 +392,10 @@ listRemove: ;void listRemove(list_t* pList, void* data, funcCmp_t* fc, funcDelet
 	mov rbp,rsp
 	sub rsp,32
 	;Save the 3 initial parameters in stack
-	mov [rsp-8],rdi
-	mov [rsp-16],rsi
-	mov [rsp-24],rdx
-	mov [rsp-32],rcx
+	mov [rbp-8],rdi
+	mov [rbp-16],rsi
+	mov [rbp-24],rdx
+	mov [rbp-32],rcx
 
 	mov rdi,[rdi+list_t_first] ;Save the next node to visit
 
@@ -405,9 +405,9 @@ listRemove: ;void listRemove(list_t* pList, void* data, funcCmp_t* fc, funcDelet
 		sub rsp,8
 		push rdi
 		;We compare the 2 values, the one pointed by *data and the actual node data
-		mov rsi,[rsp-16]
+		mov rsi,[rbp-16]
 		mov rdi,[rdi+listElem_t_data]
-		call [rsp-24]
+		call [rbp-24]
 
 		pop rdi
 		add rsp,8
@@ -428,9 +428,9 @@ listRemove: ;void listRemove(list_t* pList, void* data, funcCmp_t* fc, funcDelet
 		mov [rsi+listElem_t_next],rdx
 		mov [rdx+listElem_t_prev],rsi
 
-		cmp qword [rsp-32],0
+		cmp qword [rbp-32],0
 		je .fdIsNull 
-		call [rsp-32]
+		call [rbp-32]
 		jmp .continue
 
 		.fdIsNull:
@@ -438,14 +438,14 @@ listRemove: ;void listRemove(list_t* pList, void* data, funcCmp_t* fc, funcDelet
 		jmp .continue
 
 		.removeNodeFirst:
-		mov rdi,[rsp-8]
-		mov rsi,[rsp-32]
+		mov rdi,[rbp-8]
+		mov rsi,[rbp-32]
 		call listRemoveFirst
 		jmp .continue
 
 		.removeNodeLast:
-		mov rdi,[rsp-8]
-		mov rsi,[rsp-32]
+		mov rdi,[rbp-8]
+		mov rsi,[rbp-32]
 		call listRemoveLast
 
 		.continue:
@@ -679,20 +679,20 @@ hashTableAdd: ;void hashTableAdd(hashTable_t* pTable, void* data)
 	mov rbp,rsp
 	sub rsp,16
 
-	mov [rsp-8],rdi
-	mov [rsp-16],rsi
+	mov [rbp-8],rdi
+	mov [rbp-16],rsi
 
 	mov rdx,[rdi+hashTable_t.funcHash]
 	mov rdi,rsi
 	call rdx
 	mov rdx,rax
-	mov rdi,[rsp-8]
+	mov rdi,[rbp-8]
 	div dword [rdi+hashTable_t.size]
 	mov rdi,[rdi+hashTable_t.listArray]
 	shl rax,32
 	shr rax,32
 	mov rdi,[rdi+rax*8]
-	mov rsi,[rsp-16]
+	mov rsi,[rbp-16]
 	mov rdx,strCmp
 	call listAdd
 
