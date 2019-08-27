@@ -339,7 +339,7 @@ listAdd: ;void listAdd(list_t* pList, void* data, funcCmp_t* fc)
 
 	.cycle:
 		cmp rdi,0
-		je .end ;If next node is NULL, list end reached and we exit
+		je .insertNode ;If next node is NULL, list end reached and we exit
 		push rdi
 		push rsi
 		;We compare the 2 values, the one pointed by *data and the actual node data
