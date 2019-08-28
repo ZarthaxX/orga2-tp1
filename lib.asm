@@ -713,7 +713,13 @@ hashTableAdd: ;void hashTableAdd(hashTable_t* pTable, void* data)
 	div dword [rdi+hashTable_t.size]
 	mov rdi,[rdi+hashTable_t.listArray]
 	mov eax,edx
-	
+	shl rax,32
+	shr rax,32
+	mov rdi,[rdi+rax*8]
+	mov rdi,[rdi]
+	mov rsi,[rbp-16]
+	;mov rdx,strCmp
+	call listAddFirst
 	add rsp,16
 	pop rbp
     ret
