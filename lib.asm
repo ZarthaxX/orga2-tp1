@@ -366,7 +366,7 @@ listAdd: ;void listAdd(list_t* pList, void* data, funcCmp_t* fc)
 
 	.insertNode:
 	cmp rsi,0 ;Node is smaller than min element or list is empty
-	je .addNodeFirst
+	jmp .addNodeFirst
 	cmp rdi,0 ;Node is greater than max element
 	je .addNodeLast
 	;New node has to be inserted between 2 nodes
@@ -475,9 +475,9 @@ listRemoveFirst: ;void listRemoveFirst(list_t* pList, funcDelete_t* fd)
 	mov [rbp-8],rdi
 	mov [rbp-16],rsi
 
-	cmp qword [rdi+list_t_first],0
+	cmp qword [rdi+list_t_first],0 ;List is empty already
 	je .end
-
+	mov rdi,[rdi+list_t_first]
 	mov rdi,[rdi+listElem_t_data]
 	cmp rsi,0
 	je .fdIsNull
@@ -522,7 +522,7 @@ listRemoveLast: ;void listRemoveLast(list_t* pList, funcDelete_t* fd)
 
 	cmp qword [rdi+list_t_last],0
 	je .end
-
+	mov rdi,[rdi+list_t_last]
 	mov rdi,[rdi+listElem_t_data]
 	cmp rsi,0
 	je .fdIsNull
@@ -561,8 +561,7 @@ listDelete: ;void listDelete(list_t* pList, funcDelete_t* fd)
 	;								RDI					RSI
 	push RBP
 	mov RBP,RSP
-	push rdi
-Sub rsp,8
+	sub RSP,16
 	cmp RDI,0 ;list is null
 	je .end
 	mov RDI,[RDI+list_t_first]
@@ -570,8 +569,7 @@ Sub rsp,8
 	je .end
 
 	.cycle:
-		push rdi
-Push rsi
+		mov [RBP-8],RDI
 		mov [RBP-16],RSI
 		mov RDI,[RDI+listElem_t_data]
 		cmp RSI,0
@@ -583,17 +581,14 @@ Push rsi
 		.free:
 		call free
 
-.next:
-Pop rsi
-Pop rdi
+		.next:
+		mov RDI,[RBP-8]
+		mov RSI,[RBP-16]
 		mov RDI,[RDI+listElem_t_next]
 		cmp RDI,0
 		jne .cycle
 
 	.end:
-Add rsp,8
-pop rdi
-call free
 	add RSP,16
 	pop RBP
     ret
@@ -710,21 +705,16 @@ hashTableAdd: ;void hashTableAdd(hashTable_t* pTable, void* data)
 
 	mov [rbp-8],rdi
 	mov [rbp-16],rsi
-
 	mov rdx,[rdi+hashTable_t.funcHash]
 	mov rdi,rsi
 	call rdx
-	mov rdx,rax
+	mov edx,0
 	mov rdi,[rbp-8]
 	div dword [rdi+hashTable_t.size]
 	mov rdi,[rdi+hashTable_t.listArray]
 	shl rax,32
 	shr rax,32
-	mov rdi,[rdi+rax*8]
-	mov rsi,[rbp-16]
-	mov rdx,strCmp
-	call listAdd
-
+	
 	add rsp,16
 	pop rbp
     ret
