@@ -608,7 +608,7 @@ listPrint: ;void listPrint(list_t* pList, FILE *pFile, funcPrint_t* fp)
     mov rdi,[rbp-8]
     mov rdi,[rdi+list_t_first]
     cmp rdi,0
-    jmp .end
+    je .end
 
     .cycle:
     	mov [rbp-32],rdi
@@ -625,7 +625,7 @@ listPrint: ;void listPrint(list_t* pList, FILE *pFile, funcPrint_t* fp)
     	mov rsi,ptrFormat
     	mov rdi,[rbp-16]
     	call fprintf
-
+    	
     	.continue:
     	mov rdi,[rbp-32]
     	mov rdi,[rdi+listElem_t_next]
@@ -716,21 +716,32 @@ hashTableAdd: ;void hashTableAdd(hashTable_t* pTable, void* data)
 	shl rax,32
 	shr rax,32
 	mov rdi,[rdi+rax*8]
-	mov rdi,[rdi]
 	mov rsi,[rbp-16]
-	;mov rdx,strCmp
-	call listAddFirst
+	call listAddLast
 	add rsp,16
 	pop rbp
     ret
     
 hashTableDeleteSlot: ;void hashTableDeleteSlot(hashTable_t* pTable, uint32_t slot, funcDelete_t* fd)
-;														RDI					RSI				RDX
+;														RDI					ESI				RDX
 	push rbp
+
+	;Calculate slot number modulo array size
+	push rdx
+	mov eax,esi
+	mov edx,0
+	div dword [rdi+hashTable_t.size]
+	mov esi,edx
+	shl rsi,32
+	shr rsi,32
+	pop rdx
+
+	;Use index in rsi to erase list on that position
+	;and reinitialize it to empty list
 	mov rdi,[rdi+hashTable_t.listArray]
+	mov rdi,[rdi+rsi*8]
 	push rdi
 	push rsi
-	mov rdi,[rdi+rsi*8]
 	mov rsi,rdx
 	call listDelete
 	call listNew
@@ -743,24 +754,24 @@ hashTableDeleteSlot: ;void hashTableDeleteSlot(hashTable_t* pTable, uint32_t slo
 hashTableDelete: ;void hashTableDelete(hashTable_t* pTable, funcDelete_t* fd)
 ;													RDI					RSI
 	push rbp
-	mov rbp,rsp
-	sub rsp,16
-	mov [rbp-8],rdi
-	mov rcx,[rdi+hashTable_t.size]
+	push rdi
+	xor rcx,rcx
+	mov ecx,[rdi+hashTable_t.size]
 	mov rdi,[rdi+hashTable_t.listArray]
 	.cycle:
 		;Delete a slot from the listArray of hashtable
 		push rdi
 		push rsi
+		push rcx
+		mov rdi,[rdi]
 		call listDelete
+		pop rcx	
 		pop rsi
 		pop rdi
 		add rdi,8
 		loop .cycle
 
-	;Delete the hash table struct itself
-	mov rdi,[rbp-8]
+	pop rdi
 	call free
-	add rsp,16
 	pop rbp
     ret
