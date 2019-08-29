@@ -2,26 +2,30 @@
 
 /** STRING **/
 
+
 char* strSubstring(char* pString, uint32_t inicio, uint32_t fin) {
-	uint32_t length = 0;
-	
-	while(pString[length] != 0){
-		length++;
-	}
-	
-	if(fin >= length)
-		fin = length-1;
+	uint32_t length = strLen(pString);
+	char* ptr;
+	if(inicio <= fin && length > 0){
 		
-	uint32_t new_length = (fin-inicio+1 + 1);
-	char* ptr = (char*) malloc((fin-inicio+1 + 1)* sizeof(char));
-	
-	for(uint32_t i = inicio;i <= fin;i++){
-		ptr[i-inicio] = pString[i];
+		if(fin >= length)
+			fin = length-1;
+			
+		uint32_t new_length = (fin-inicio+1 + 1);
+		ptr = (char*) malloc(new_length* sizeof(char));
+		
+		for(uint32_t i = inicio;i <= fin;i++){
+			ptr[i-inicio] = pString[i];
+		}
+		
+		ptr[new_length-1] = 0;
+		
+	}else{
+		ptr = (char*)malloc((length+1) * sizeof(char));
+		for(uint32_t i = 0;i < length+1;i++){
+			ptr[i] = pString[i];
+		}
 	}
-	
-	cerr << new_length << endl;
-	ptr[new_length-1] = 0;
-	
 	free(pString);
     return ptr;
 }
@@ -29,7 +33,7 @@ char* strSubstring(char* pString, uint32_t inicio, uint32_t fin) {
 /** Lista **/
 
 void listPrintReverse(list_t* pList, FILE *pFile, funcPrint_t* fp) {
-	s_listElem* last = pList->last;
+	listElem_t* last = pList->last;
 
 	fprintf(pFile,"[");
 
@@ -58,14 +62,14 @@ uint32_t strHash(char* pString) {
 }
 
 void hashTableRemoveAll(hashTable_t* pTable, void* data, funcCmp_t* fc, funcDelete_t* fd) {
-	uint32_t index = ((*fc)((char*)data)) % pTable->size;
+	uint32_t index = pTable->funcHash((char*)data) % pTable->size;
 	listRemove(pTable->listArray[index],data,fc,fd);
 }
 
 void hashTablePrint(hashTable_t* pTable, FILE *pFile, funcPrint_t* fp) {
 	for(uint32_t i = 0;i < pTable->size;i++){
 		fprintf(pFile,"%d = ",i);
-		listPrint(pTable->listArray[i],pFile,fp);
+		listPrintReverse(pTable->listArray[i],pFile,fp);
 		fprintf(pFile, "\n");
 	}
 }
