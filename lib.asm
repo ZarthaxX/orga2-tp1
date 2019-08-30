@@ -81,58 +81,29 @@ strClone: ;char* strClone(char* pString)
     pop RBP
     ret
 
+
+%define lenA r12
+%define lenB r13
+%define stringA r14
+%define stringB r15
 strCmp: ;int32_t strCmp(char* pStringA, char* pStringB)
 ;                           RDI             RSI
-    push RBP
-    ;Obtengo la longitud del string A y lo guardo en RDX
-    push RDI
-    push RSI
-    call strLen
-    pop RSI
-    pop RDI
-    mov RDX,RAX
     
-    ;Obtengo la longitud del string B y lo guardo en RCX
-    push RDX
-    push RDI
-    push RSI
-    mov RDI,RSI
-    call strLen
-    pop RSI
-    pop RDI
-    pop RDX
-    mov RCX,RAX
-
-    ;Guardo la maxima longitud de las strings A y B 
-    ;y en RAX el resultado si al comparar ambas strings hasta la longitud mas corta son iguales
-    xor RAX,RAX
-    mov EAX,0
-    cmp RCX,RDX
-    jz .cycle ;Si los strings son iguales hay que devolver 0 porque tienen misma longitud
-    mov EAX,1
-    jg .cycle ;Ya esta en RCX la longitud de B y en EAX hay que
-              ;devolver 1 si comparados son iguales omitiendo los caracteres extra de B
-    mov EAX,-1
-    mov RCX,RDX
     .cycle:
-        mov R8,[RDI]
-        cmp R8,[RSI]
-        jg .stringAisFirst
-        jb .stringBisFirst
-        inc RDI
-        inc RSI
-        loop .cycle
-    jmp .end
-
-    .stringAisFirst:
-    mov EAX,-1
-    jmp .end
+        mov dx,[rdi]
+        cmp dx,[rsi]
+        mov eax,1
+        jb .end
+        mov eax,-1
+        jg .end
+        cmp byte [rdi],0
+        mov eax,0
+        je .end
+        inc rdi
+        inc rsi
+        jmp .cycle
     
-    .stringBisFirst:
-    mov EAX,1
-
     .end:
-    pop RBP
     ret
 
 strConcat: ;char* strConcat(char* pStringA, char* pStringB)
@@ -575,40 +546,36 @@ listRemoveLast: ;void listRemoveLast(list_t* pList, funcDelete_t* fd)
     pop rbp
     ret
 
+%define actual_node r12
+%define funcDelete r13
+%define NULL 0
 listDelete: ;void listDelete(list_t* pList, funcDelete_t* fd)
     ;                               RDI                 RSI
-    push RBP
-    mov RBP,RSP
-    sub RSP,16
-    cmp RDI,0 ;list is null
-    je .end
-    mov RDI,[RDI+list_t_first]
-    cmp RDI,0
-    je .end
+    push actual_node
+    push funcDelete
+    push rdi
+    mov funcDelete,rsi
+    mov actual_node,[rdi+list_t_first]
 
     .cycle:
-        mov [RBP-8],RDI
-        mov [RBP-16],RSI
-        mov RDI,[RDI+listElem_t_data]
-        cmp RSI,0
-        je .free 
-
-        call RSI
-        jmp .next
-
-        .free:
+        cmp qword actual_node,NULL
+        je .end
+        mov rdi,[actual_node+listElem_t_data]
+        cmp funcDelete,NULL
+        je .funcDeleteIsNull
+        call funcDelete
+        .funcDeleteIsNull:
+        mov rdi,actual_node
+        mov actual_node,[actual_node+listElem_t_next]
         call free
-
-        .next:
-        mov RDI,[RBP-8]
-        mov RSI,[RBP-16]
-        mov RDI,[RDI+listElem_t_next]
-        cmp RDI,0
-        jne .cycle
-
+        jmp .cycle
     .end:
-    add RSP,16
-    pop RBP
+    pop rdi
+    sub rsp,8
+    call free
+    add rsp,8
+    pop funcDelete
+    pop actual_node
     ret
 
 listPrint: ;void listPrint(list_t* pList, FILE *pFile, funcPrint_t* fp)
