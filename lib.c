@@ -69,7 +69,8 @@ void hashTableRemoveAll(hashTable_t* pTable, void* data, funcCmp_t* fc, funcDele
 void hashTablePrint(hashTable_t* pTable, FILE *pFile, funcPrint_t* fp) {
 	for(uint32_t i = 0;i < pTable->size;i++){
 		fprintf(pFile,"%d = ",i);
-		listPrintReverse(pTable->listArray[i],pFile,fp);
+		listPrint(pTable->listArray[i],pFile,fp);
 		fprintf(pFile, "\n");
 	}
 }
+
