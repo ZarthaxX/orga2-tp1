@@ -97,77 +97,76 @@ strCmp: ;int32_t strCmp(char* pStringA, char* pStringB)
     .end:
     ret
 
+%define stringA r12
+%define stringB r13
+%define lenA    r14
+%define lenB    r15
+
 strConcat: ;char* strConcat(char* pStringA, char* pStringB)
 ;                               RDI             RSI
-    push rbp
-    mov rbp,rsp
-    sub rsp,32
-    mov [rbp-8],rdi
-    mov [rbp-16],rsi
+    push stringA
+    push stringB
+    push lenA
+    push lenB
+    sub rsp,8
+    mov stringA,rdi
+    mov stringB,rsi
 
-    ;Get length of string A
+    ;Get length of string A and extend to 64 bits
     call strLen
     shl rax,32
     shr rax,32
-    mov [rbp-24],rax
+    mov lenA,rax
 
     ;Get length of string B
-    mov rdi,[rbp-16]
+    mov rdi,stringB
     call strLen
     shl rax,32
     shr rax,32
-    mov [rbp-32],rax
-
-    ;Allocate block of memory for concat of strings
-    mov rdi,[rbp-24]
-    add rdi,[rbp-32]
+    mov lenB,rax
+    
+    ;ALlocate space for new string
+    mov rdi,lenA
+    add rdi,lenB
     inc rdi
     call malloc
 
-    mov rdx,0
-    mov rdi,[rbp-8]
+    ;Copy string A
+    mov rcx,lenA
+    inc rcx ;Increment lenA to make loop easier,won't fail by copying the termination char
     .copyA:
-        cmp byte [rdi+rdx*1],0
-        je .endCopyA
-        mov cl,[rdi+rdx*1]
-        mov [rax+rdx],cl
-        inc rdx
-        jmp .copyA
+        mov dl,[stringA+rcx-1]
+        mov [rax+rcx-1],dl
+        loop .copyA
 
-    .endCopyA:
-
-    mov rdx,0
-    mov rdi,[rbp-16]
+    mov rcx,lenB
+    inc rcx ;Increment lenB to copy termination char
     .copyB:
-        cmp byte [rdi+rdx*1],0
-        je .endCopyB
-        mov cl,[rdi+rdx*1]
-        push rdx
-        add rdx,[rbp-24]
-        mov [rax+rdx],cl
-        pop rdx
-        inc rdx
-        jmp .copyB
+        mov rsi,lenA
+        add rsi,rcx
+        mov dl,[stringB+rcx-1]
+        mov [rax+rsi-1],dl
+        loop .copyB
 
-    .endCopyB:
-
-    mov rdx,[rbp-24]
-    add rdx,[rbp-32]
-    mov byte [rax+rdx*1],0
-
-    sub rsp,8
     push rax
-    mov rdi,[rbp-8]
+    sub rsp,8
+
+    mov rdi,stringA
     call strDelete
-    mov rdi,[rbp-16]
-    cmp rdi,[rbp-8]
-    je .sameStrings
+    cmp stringA,stringB
+    je .sameStringPtr
+    mov rdi,stringB
     call strDelete
-    .sameStrings:
-    pop rax
+
+    .sameStringPtr:
     add rsp,8
-    add rsp,32
-    pop rbp
+    pop rax
+    
+    add rsp,8
+    pop lenB
+    pop lenA
+    pop stringB
+    pop stringA
     ret
 
 strDelete: ;void strDelete(char* pString)
@@ -179,16 +178,12 @@ strDelete: ;void strDelete(char* pString)
 
 strPrint: ;void strPrint(char* pString, FILE *pFile)
 ;                               RDI         RSI
-    push RBP
-    push RDI
-    push RSI
-    call strLen
-    pop RSI
-    pop RDI
-    cmp EAX,0
+    sub rsp,8
+    cmp byte [rdi],0
     jne .stringNotNull
     mov RDI,RSI
-    mov RSI,null
+    mov RSI,strFormat
+    mov RDX,null
     call fprintf
     jmp .end
 
@@ -198,7 +193,7 @@ strPrint: ;void strPrint(char* pString, FILE *pFile)
     mov RSI,strFormat
     call fprintf
     .end:
-    pop RBP
+    add rsp,8
     ret
    
 
@@ -463,32 +458,34 @@ listRemove: ;void listRemove(list_t* pList, void* data, funcCmp_t* fc, funcDelet
     pop actual_node
     ret
 
+%define list_ptr r12
+%define funcDelete r13
+
 listRemoveFirst: ;void listRemoveFirst(list_t* pList, funcDelete_t* fd)
 ;                                           RDI                 RSI
-    push rbp
-    mov rbp,rsp
-    sub rsp,16
-    mov [rbp-8],rdi
-    mov [rbp-16],rsi
+    push list_ptr
+    push funcDelete
+    mov list_ptr,rdi
+    mov funcDelete,rsi
 
-    cmp qword [rdi+list_t_first],0 ;List is empty already
+    cmp qword [list_ptr+list_t_first],0 ;List is empty already
     je .end
-    mov rdi,[rdi+list_t_first]
+    mov rdi,[list_ptr+list_t_first]
     mov rdi,[rdi+listElem_t_data]
-    cmp rsi,0
+    cmp funcDelete,0
     je .eraseStruct
-    call [rbp-16]
-    
+    sub rsp,8
+    call funcDelete
+    add rsp,8
+
     .eraseStruct:
-    mov rdi,[rbp-8]
+    mov rdi,list_ptr
     mov rdi,[rdi+list_t_first]
     mov rsi,[rdi+listElem_t_next]
     push rsi
-    sub rsp,8
     call free
-    add rsp,8
     pop rsi
-    mov rdi,[rbp-8]
+    mov rdi,list_ptr
     cmp rsi,0
     je .emptyList
     mov [rdi+list_t_first],rsi
@@ -500,36 +497,38 @@ listRemoveFirst: ;void listRemoveFirst(list_t* pList, funcDelete_t* fd)
     mov qword [rdi+list_t_last],0
 
     .end:
-    add rsp,16
-    pop rbp
+    pop funcDelete
+    pop list_ptr
     ret
+
+%define list_ptr r12
+%define funcDelete r13
 
 listRemoveLast: ;void listRemoveLast(list_t* pList, funcDelete_t* fd)
 ;                                           RDI                 RSI
-    push rbp
-    mov rbp,rsp
-    sub rsp,16
-    mov [rbp-8],rdi
-    mov [rbp-16],rsi
+    push list_ptr
+    push funcDelete
+    mov list_ptr,rdi
+    mov funcDelete,rsi
 
-    cmp qword [rdi+list_t_last],0
+    cmp qword [list_ptr+list_t_last],0 ;List is empty already
     je .end
-    mov rdi,[rdi+list_t_last]
+    mov rdi,[list_ptr+list_t_last]
     mov rdi,[rdi+listElem_t_data]
-    cmp rsi,0
+    cmp funcDelete,0
     je .eraseStruct
-    call [rbp-16]
+    sub rsp,8
+    call funcDelete
+    add rsp,8
 
     .eraseStruct:
-    mov rdi,[rbp-8]
+    mov rdi,list_ptr
     mov rdi,[rdi+list_t_last]
     mov rsi,[rdi+listElem_t_prev]
     push rsi
-    sub rsp,8
     call free
-    add rsp,8
     pop rsi
-    mov rdi,[rbp-8]
+    mov rdi,list_ptr
     cmp rsi,0
     je .emptyList
     mov [rdi+list_t_last],rsi
@@ -541,9 +540,10 @@ listRemoveLast: ;void listRemoveLast(list_t* pList, funcDelete_t* fd)
     mov qword [rdi+list_t_last],0
 
     .end:
-    add rsp,16
-    pop rbp
+    pop funcDelete
+    pop list_ptr
     ret
+
 
 %define actual_node r12
 %define funcDelete r13
@@ -576,56 +576,64 @@ listDelete: ;void listDelete(list_t* pList, funcDelete_t* fd)
     pop actual_node
     ret
 
+%define pList r12
+%define pFile r13
+%define funcPrint r14
+%define actual_node r15
 listPrint: ;void listPrint(list_t* pList, FILE *pFile, funcPrint_t* fp)
     ;                               RDI         RSI             RDX
-    push rbp
-    mov rbp,rsp
-    sub rsp,32
-    mov [rbp-8],rdi
-    mov [rbp-16],rsi
-    mov [rbp-24],rdx
-    mov rdi,rsi
+    push list_ptr
+    push pFile
+    push funcPrint
+    push actual_node
+    sub rsp,8
+
+    mov list_ptr,rdi
+    mov pFile,rsi
+    mov funcPrint,rdx
+
+    mov rdi,pFile
     mov rsi,listStart
     call fprintf
 
-    mov rdi,[rbp-8]
-    mov rdi,[rdi+list_t_first]
-    cmp rdi,0
+    mov actual_node,[pList+list_t_first]
+    cmp actual_node,0
     je .end
 
     .cycle:
-        mov [rbp-32],rdi
-        cmp qword [rbp-24],0
+        cmp qword funcPrint,0
         je .fpIsNull
 
-        mov rdi,[rdi+listElem_t_data]
-        mov rsi,[rbp-16]
-        call [rbp-24]
+        mov rdi,[actual_node+listElem_t_data]
+        mov rsi,pFile
+        call funcPrint
         jmp .continue
 
         .fpIsNull:
-        mov rdx,[rdi+listElem_t_data]
+        mov rdx,[actual_node+listElem_t_data]
         mov rsi,ptrFormat
-        mov rdi,[rbp-16]
+        mov rdi,pFile
         call fprintf
         
         .continue:
-        mov rdi,[rbp-32]
-        mov rdi,[rdi+listElem_t_next]
-        cmp rdi,0
+        mov actual_node,[actual_node+listElem_t_next]
+        cmp actual_node,0
         je .end
-        mov [rbp-32],rdi
-        mov rdi,[rbp-16]
+        mov rdi,pFile
         mov rsi,elementSeparator
         call fprintf
-        mov rdi,[rbp-32]
         jmp .cycle
     .end:
-    mov rdi,[rbp-16]
+    mov rdi,pFile
     mov rsi,listEnd
     call fprintf
-    add rsp,32
-    pop rbp
+
+    add rsp,8
+    pop actual_node
+    pop funcPrint
+    pop pFile
+    pop list_ptr
+    
     ret
 
 %if 0
@@ -641,30 +649,36 @@ typedef struct s_hashTable{
 %define hashTable_t.funcHash 16
 %define hashTable_t_size 24
 
+%define size r12
+%define funcHash r13
+%define hashTable r14
+
 hashTableNew: ;hashTable_t* hashTableNew(uint32_t size, funcHash_t* funcHash)
-;                                               RDI                     RSI
-    push rbp
-    mov rbp,rsp
-    sub rsp,32
-    mov [rbp-8],rdi
-    mov [rbp-16],rsi
+;                                               EDI                     RSI
+    push size
+    push funcHash
+    push hashTable
+
+    shl rdi,32
+    shr rdi,32
+    mov size,rdi
+    mov funcHash,rsi
 
     ;Initialize the hashTable struct
     mov rdi,hashTable_t_size
     call malloc
-    mov [rbp-24],rax
+    mov hashTable,rax
 
     ;We initialize the values in hashTable
-    mov rdx,[rbp-16]
-    mov [rax+hashTable_t.funcHash],rdx
-    mov rdx,[rbp-8]
-    mov [rax+hashTable_t.size],rdx
+    mov [rax+hashTable_t.funcHash],funcHash
+    mov rdx,size
+    mov [rax+hashTable_t.size],edx
     lea rdi,[rdx*8]
     call malloc
-    mov rdx,[rbp-24]
+    mov rdx,hashTable
     mov [rdx+hashTable_t.listArray],rax
 
-    mov rcx,[rbp-8]
+    mov rcx,size
     mov rdx,rax
     .cycle:
         push rcx
@@ -675,38 +689,45 @@ hashTableNew: ;hashTable_t* hashTableNew(uint32_t size, funcHash_t* funcHash)
         mov [rdx+rcx*8-8],rax
         loop .cycle
     ;Save on rax the pointer to the hashTable
-    mov rax,[rbp-24]
-    add rsp,32
-    pop rbp
+    mov rax,hashTable
+    
+    pop hashTable
+    pop funcHash
+    pop size
     ret
+
+%define hashTable r12
+%define data r13
 
 hashTableAdd: ;void hashTableAdd(hashTable_t* pTable, void* data)
 ;                                           RDI             RSI
-    push rbp
-    mov rbp,rsp
-    sub rsp,16
+    push hashTable
+    push data
+    sub rsp,8
 
-    mov [rbp-8],rdi
-    mov [rbp-16],rsi
-    mov rdx,[rdi+hashTable_t.funcHash]
-    mov rdi,rsi
+    mov hashTable,rdi
+    mov data,rsi
+    mov rdx,[hashTable+hashTable_t.funcHash]
+    mov rdi,data
     call rdx
     mov edx,0
-    mov rdi,[rbp-8]
-    div dword [rdi+hashTable_t.size]
-    mov rdi,[rdi+hashTable_t.listArray]
+    div dword [hashTable+hashTable_t.size]
+    mov rdi,[hashTable+hashTable_t.listArray]
     mov eax,edx
     shl rax,32
     shr rax,32
     mov rdi,[rdi+rax*8]
-    mov rsi,[rbp-16]
+    mov rsi,data
     call listAddLast
-    add rsp,16
-    pop rbp
+    
+    add rsp,8
+    pop data
+    pop hashTable
     ret
 
 %define hashTable r12
 %define funcDelete r13
+
 hashTableDeleteSlot: ;void hashTableDeleteSlot(hashTable_t* pTable, uint32_t slot, funcDelete_t* fd)
 ;                                                       RDI                 ESI             RDX
     push hashTable
@@ -773,5 +794,6 @@ hashTableDelete: ;void hashTableDelete(hashTable_t* pTable, funcDelete_t* fd)
     pop funcDelete
     pop hashTable
     ret
+
 
 
