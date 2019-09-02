@@ -1,5 +1,7 @@
 section .rodata
 
+%define NULL 0
+
 null : DB 'NULL',0
 strFormat : DB '%s',0
 
@@ -55,48 +57,37 @@ strLen: ;uint32_t strLen(char* pString)
 
 strClone: ;char* strClone(char* pString)
 ;                               RDI
-    push RBP
-    ;Obtengo la longitud del string y lo guardo en RCX
-    push RDI
-    sub RSP,8
+    push r12
+    mov r12,rdi
     call strLen
-    add RSP,8
-    pop RDI
-    mov RCX,RAX
-    inc RCX ;Sumo 1 para el caracter nulo
-    ;Inicializo un bloque de memoria para guardar el nuevo string
-    push RDI
-    push RCX
-    mov RDI,RCX
+    xor rdi,rdi
+    mov edi,eax
+    inc edi
     call malloc
-    pop RCX
-    pop RDI
 
-    ;Recorro el string original incrementado el puntero en RDI y copio el contenido en RAX
-    .ciclo:
-        mov SIL,[RDI + RCX * 1 - 1]
-        mov [RAX + RCX * 1 - 1],SIL
-        loop .ciclo
+    mov rcx,0
+    .cycle:
+        mov dl,[r12+rcx]
+        mov [rax+rcx],dl
+        inc rcx
+        cmp dl,0
+        jne .cycle
 
-    pop RBP
+
+    pop r12
     ret
 
-
-%define lenA r12
-%define lenB r13
-%define stringA r14
-%define stringB r15
 strCmp: ;int32_t strCmp(char* pStringA, char* pStringB)
 ;                           RDI             RSI
     
     .cycle:
-        mov dx,[rdi]
-        cmp dx,[rsi]
+        mov dl,[rdi]
+        cmp dl,[rsi]
         mov eax,1
         jb .end
         mov eax,-1
         jg .end
-        cmp byte [rdi],0
+        cmp dl,0
         mov eax,0
         je .end
         inc rdi
@@ -315,145 +306,161 @@ listAddLast: ;void listAddLast(list_t* pList, void* data)
 ;%define list_t_size 16
 ;%define listElem_t_size 24
 
+
+%define next_node r12
+%define prev_node r13
+%define funcCmp r14
+%define data r15
+%define new_node rax
+%define list_ptr rbx
 listAdd: ;void listAdd(list_t* pList, void* data, funcCmp_t* fc)
 ;                               RDI         RSI             RDX
-    push rbp
-    mov rbp,rsp
-    sub rsp,32
-    ;Save the 3 initial parameters in stack
-    mov [rbp-8],rdi
-    mov [rbp-16],rsi
-    mov [rbp-24],rdx
+    push next_node
+    push prev_node
+    push data
+    push funcCmp
+    push list_ptr
+
+    mov list_ptr,rdi
+    mov data,rsi
+    mov funcCmp,rdx
+
+    mov next_node,[list_ptr+list_t_first] ;Save the next node to visit
+    mov prev_node,0 ;Save the last seen prev node,initially NULL
+    .cycle:
+        cmp next_node,0
+        je .insertNode ;If next node is NULL, list end reached and we exit
+        ;We compare the 2 values, the one pointed by *data and the actual node data
+        mov rsi,data
+        mov rdi,[next_node+listElem_t_data]
+        call funcCmp
+
+        cmp rax,1 
+        jne .insertNode ;Jump if the new node data is <= next node data
+        mov prev_node,next_node
+        mov next_node,[next_node+listElem_t_next]
+        jmp .cycle
+
+    .insertNode:
+    cmp prev_node,0 ;Node is smaller than min element or list is empty
+    je .addNodeFirst
+    cmp next_node,0 ;Node is greater than max element
+    je .addNodeLast
+    ;New node has to be inserted between 2 nodes
 
     ;Create new node for list
     mov rdi,listElem_t_size
     call malloc
-    mov [rbp-32],rax
-    mov rsi,[rbp-16]
-    mov [rax+listElem_t_data],rsi
-    mov rdi,[rbp-8]
-    mov rdi,[rdi+list_t_first] ;Save the next node to visit
-    mov rsi,0 ;Save the last seen prev node,initially NULL
-
-    .cycle:
-        cmp rdi,0
-        je .insertNode ;If next node is NULL, list end reached and we exit
-        push rdi
-        push rsi
-        ;We compare the 2 values, the one pointed by *data and the actual node data
-        mov rsi,[rbp-16]
-        mov rdi,[rdi+listElem_t_data]
-        call [rbp-24]
-        pop rsi
-        pop rdi
-
-        cmp rax,1 
-        jne .insertNode ;Jump if the new node data is <= next node data
-        mov rsi,rdi
-        mov rdi,[rdi+listElem_t_next]
-        jmp .cycle
-
-    .insertNode:
-    cmp rsi,0 ;Node is smaller than min element or list is empty
-    jmp .addNodeFirst
-    cmp rdi,0 ;Node is greater than max element
-    je .addNodeLast
-    ;New node has to be inserted between 2 nodes
-    mov rdx,[rbp-32]
-    mov [rsi+listElem_t_next],rdx ;prevNode.next points to newNode
-    mov [rdi+listElem_t_prev],rdx ;nextNode.prev points to newNode
-    mov [rdx+listElem_t_prev],rsi ;newNode.prev points to prevNode
-    mov [rdx+listElem_t_next],rdi ;newNode.next points to nextNode
+    mov [rax+listElem_t_data],data
+    mov [prev_node+listElem_t_next],new_node ;prevNode.next points to newNode
+    mov [next_node+listElem_t_prev],new_node ;nextNode.prev points to newNode
+    mov [new_node+listElem_t_prev],prev_node ;newNode.prev points to prevNode
+    mov [new_node+listElem_t_next],next_node ;newNode.next points to nextNode
     jmp .end
 
     .addNodeFirst:
-    mov rdi,[rbp-8]
-    mov rsi,[rbp-16]
+    mov rdi,list_ptr
+    mov rsi,data
     call listAddFirst
     jmp .end
 
     .addNodeLast:
-    mov rdi,[rbp-8]
-    mov rsi,[rbp-16]
+    mov rdi,list_ptr
+    mov rsi,data
     call listAddLast
     jmp .end
 
     .end:
-    add rsp,32
-    pop rbp
+    pop list_ptr
+    pop funcCmp
+    pop data
+    pop prev_node
+    pop next_node
     ret
 
 
+%define actual_node r12
+%define funcDelete r13
+%define funcCmp r14
+%define data r15
+%define list_ptr rbx
+
 listRemove: ;void listRemove(list_t* pList, void* data, funcCmp_t* fc, funcDelete_t* fd)
 ;                               RDI         RSI             RDX                     RCX
-    push rbp
-    mov rbp,rsp
-    sub rsp,48
+    push actual_node
+    push funcDelete
+    push funcCmp
+    push data
+    push list_ptr
     ;Save the 3 initial parameters in stack
-    mov [rbp-8],rdi
-    mov [rbp-16],rsi
-    mov [rbp-24],rdx
-    mov [rbp-32],rcx
+    mov list_ptr,rdi
+    mov data,rsi
+    mov funcCmp,rdx
+    mov funcDelete,rcx
 
-    mov rdi,[rdi+list_t_first] ;Save the next node to visit
+    mov actual_node,[list_ptr+list_t_first] ;Save the next node to visit
 
     .cycle:
-        cmp rdi,0
-        je .end ;If next node is NULL, list end reached and we exit
-        mov [rbp-40],rdi ; Save actual node pointer
-        mov rsi,[rdi+listElem_t_next]
-        mov [rbp-48],rsi ; Save next node pointer
-        ;We compare the 2 values, the one pointed by *data and the actual node data
-        mov rsi,[rbp-16]
-        mov rdi,[rdi+listElem_t_data]
-        call [rbp-24]
+        ;Check if end of list has been reached
+        cmp actual_node,NULL
+        je .end 
 
-        cmp rax,0
-        jne .continue ;Continue if the new node data is == next node data
-        
-        mov rdi,[rbp-40]
-        mov rsi,[rdi+listElem_t_prev]
-        cmp rsi,0 ;Node has no prev, so it is the first node
-        je .removeNodeFirst
-        mov rdx,[rdi+listElem_t_next]
-        cmp rdx,0 ;Node has no next, so it is the last node
-        je .removeNodeLast
-        ;Delete node between 2 nodes
-        mov [rsi+listElem_t_next],rdx
-        mov [rdx+listElem_t_prev],rsi
+        ;Save next node in rdi and save it on stack for next iteration
+        mov rdi,[actual_node+listElem_t_next]
+        push rdi
+        sub rsp,8
 
-        mov rdi,[rdi+listElem_t_data]
-        cmp qword [rbp-32],0
-        je .fdIsNull 
-        call [rbp-32]
-        jmp .deleteStruct
+        ;Check if both strings are equal
+        mov rdi,[actual_node+listElem_t_data]
+        mov rsi,data
+        call funcCmp
+        cmp eax,0
+        jne .continue
 
-        .fdIsNull:
+        ;Gotta delete this node
+        mov rdi,list_ptr
+        mov rsi,funcDelete
+        cmp [list_ptr+list_t_first],actual_node
+        je .deleteFirst
+        cmp [list_ptr+list_t_last],actual_node
+        je .deleteLast
+        ;It is a middle node so it has a next and prev
+        mov rdi,[actual_node+listElem_t_next]
+        mov rsi,[actual_node+listElem_t_prev]
+        mov [rdi+listElem_t_prev],rsi
+        mov [rsi+listElem_t_next],rdi
+
+        push qword [actual_node+listElem_t_data]
+        sub rsp,8
+        mov rdi,actual_node
         call free
+        add rsp,8
 
-        .deleteStruct:
-        mov rdi,[rbp-40]
-        call free
+        ;Get the pointer to data from stack to rdi and delete data
+        pop rdi
+        cmp funcDelete,NULL
+        je .continue
+        call funcDelete
         jmp .continue
 
-        .removeNodeFirst:
-        mov rdi,[rbp-8]
-        mov rsi,[rbp-32]
+        .deleteFirst:
         call listRemoveFirst
         jmp .continue
 
-        .removeNodeLast:
-        mov rdi,[rbp-8]
-        mov rsi,[rbp-32]
+        .deleteLast:
         call listRemoveLast
 
         .continue:
-        mov rdi,[rbp-48]
+        add rsp,8
+        pop actual_node
         jmp .cycle
 
-    .end:
-    add rsp,48
-    pop rbp
+    .end:    
+    pop list_ptr
+    pop data
+    pop funcCmp
+    pop funcDelete
+    pop actual_node
     ret
 
 listRemoveFirst: ;void listRemoveFirst(list_t* pList, funcDelete_t* fd)
@@ -469,12 +476,8 @@ listRemoveFirst: ;void listRemoveFirst(list_t* pList, funcDelete_t* fd)
     mov rdi,[rdi+list_t_first]
     mov rdi,[rdi+listElem_t_data]
     cmp rsi,0
-    je .fdIsNull
+    je .eraseStruct
     call [rbp-16]
-    jmp .eraseStruct
-
-    .fdIsNull:
-    call free
     
     .eraseStruct:
     mov rdi,[rbp-8]
@@ -514,13 +517,9 @@ listRemoveLast: ;void listRemoveLast(list_t* pList, funcDelete_t* fd)
     mov rdi,[rdi+list_t_last]
     mov rdi,[rdi+listElem_t_data]
     cmp rsi,0
-    je .fdIsNull
+    je .eraseStruct
     call [rbp-16]
-    jmp .eraseStruct
 
-    .fdIsNull:
-    call free
-    
     .eraseStruct:
     mov rdi,[rbp-8]
     mov rdi,[rdi+list_t_last]
@@ -548,7 +547,6 @@ listRemoveLast: ;void listRemoveLast(list_t* pList, funcDelete_t* fd)
 
 %define actual_node r12
 %define funcDelete r13
-%define NULL 0
 listDelete: ;void listDelete(list_t* pList, funcDelete_t* fd)
     ;                               RDI                 RSI
     push actual_node
@@ -706,57 +704,74 @@ hashTableAdd: ;void hashTableAdd(hashTable_t* pTable, void* data)
     add rsp,16
     pop rbp
     ret
-    
+
+%define hashTable r12
+%define funcDelete r13
 hashTableDeleteSlot: ;void hashTableDeleteSlot(hashTable_t* pTable, uint32_t slot, funcDelete_t* fd)
 ;                                                       RDI                 ESI             RDX
-    push rbp
+    push hashTable
+    push funcDelete
 
+    mov hashTable,rdi
+    mov funcDelete,rdx
     ;Calculate slot number modulo array size
-    push rdx
     mov eax,esi
     mov edx,0
     div dword [rdi+hashTable_t.size]
     mov esi,edx
     shl rsi,32
     shr rsi,32
-    pop rdx
 
     ;Use index in rsi to erase list on that position
     ;and reinitialize it to empty list
-    mov rdi,[rdi+hashTable_t.listArray]
+    mov rdi,[hashTable+hashTable_t.listArray]
     mov rdi,[rdi+rsi*8]
-    push rdi
     push rsi
-    mov rsi,rdx
+    mov rsi,funcDelete
     call listDelete
     call listNew
     pop rsi
-    pop rdi
+    mov rdi,[hashTable+hashTable_t.listArray]
     mov [rdi+rsi*8],rax
-    pop rbp
+
+    pop funcDelete
+    pop hashTable
     ret
 
+
+%define hashTable r12
+%define funcDelete r13
 hashTableDelete: ;void hashTableDelete(hashTable_t* pTable, funcDelete_t* fd)
 ;                                                   RDI                 RSI
-    push rbp
-    push rdi
+    push hashTable
+    push funcDelete
+    mov hashTable,rdi
+    mov funcDelete,rsi
     xor rcx,rcx
     mov ecx,[rdi+hashTable_t.size]
-    mov rdi,[rdi+hashTable_t.listArray]
+
     .cycle:
         ;Delete a slot from the listArray of hashtable
-        push rdi
-        push rsi
+        
         push rcx
-        mov rdi,[rdi]
+        mov rdi,[hashTable+hashTable_t.listArray]
+        mov rdi,[rdi+rcx*8-8]
+        mov rsi,funcDelete
         call listDelete
-        pop rcx 
-        pop rsi
-        pop rdi
-        add rdi,8
+        pop rcx
+
         loop .cycle
 
-    pop rdi
+  
+    sub rsp,8
+    mov rdi,[hashTable+hashTable_t.listArray]
     call free
-    pop rbp
+    mov rdi,hashTable
+    call free
+
+    add rsp,8
+    pop funcDelete
+    pop hashTable
     ret
+
+
